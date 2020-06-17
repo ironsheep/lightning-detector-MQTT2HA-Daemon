@@ -1,0 +1,84 @@
+# Configuration file for Xiaomi Mi Flora Plant Sensor MQTT Client/Daemon
+# Source: https://github.com/ThomDietrich/miflora-mqtt-daemon
+#
+# Uncomment and adapt all settings as needed.
+# Some settings can be configured by environment variables.
+# If an env variable is set, it takes precedence over settings in this file
+
+[General
+
+
+[Daemon]
+
+# Enable or Disable an endless execution loop (Default: true)
+#enabled = true
+
+
+[MQTT]
+
+# The hostname or IP address of the MQTT broker to connect to (Default: localhost)
+# Also read from the MQTT_HOSTNAME environment variable
+#hostname = localhost
+
+# The TCP port the MQTT broker is listening on (Default: 1883)
+# Also read from the MQTT_PORT environment variable
+#port = 1883
+
+# Maximum period in seconds between ping messages to the broker. (Default: 60)
+#keepalive = 60
+
+
+# NOTE: The MQTT topic used for this device is constructed as:
+#  {base_topic}/{sensor_name}
+#
+# The MQTT base topic to publish the Lightning detector sensor data topics under.
+#base_topic = home/nodes
+
+# The MQTT name for this Lightning detector sensor
+#sensor_name = lightningdetector
+
+
+# The MQTT broker authentification credentials (Default: no authentication)
+# Will also read from MQTT_USERNAME and MQTT_PASSWORD environment variables
+#username = user
+#password = pwd123
+
+# Enable TLS/SSL on the connection
+#tls = false
+
+# Path to CA Certificate file to verify host
+#tls_ca_cert =
+
+# Path to TLS client auth key file
+#tls_keyfile =
+
+# Path to TLS client auth certificate file
+#tls_certfile =
+
+[Sensor]
+
+# decribe how your sensor is hooked up to your RPi
+#  NOTE: only i2c supported for now
+
+# GPIO pin used for interrupts
+#intr_pin = 17
+
+# Rev. 1 Raspberry Pis should leave bus set at 0, while rev. 2 Pis should set
+# bus equal to 1. The address should be changed to match the address of the
+# sensor.
+
+#i2c_bus = 1
+#i2c_address = 0x03
+
+# Indoors (True) = more sensitive (can miss very strong lightnings)
+# Outdoors (False) = less sensitive (can miss far away lightnings)
+#detector_afr_gain_indoor = True
+
+#detector_noise_floor = 1
+
+# Prevent single isolated strikes from being logged => interrupts begin after
+# this number of strikes (def: 5, value 1,5,9,16), then are fired normally.
+#detector_min_strikes = 5
+
+
+

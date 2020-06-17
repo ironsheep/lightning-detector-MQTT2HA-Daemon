@@ -9,7 +9,7 @@ This script can be configured to be run in **daemon mode** continously in the ba
 
 
 ## Features
-* Tested on Raspberry Pi's 3 & 4 with Buster but really should work on any.
+* Tested on Raspberry Pi's 3 & 4 with Buster - but really should work on any.
 * Tested with Home Assistant v0.111.0
 * Tested with Mosquitto broker v5.1
 * Data is published via MQTT
@@ -24,15 +24,15 @@ The AS3935 Lightning Detector monitored by this script is reported as:
 
 | Name            | Description |
 |-----------------|-------------|
-| `Manufacturer`   | Austria Micro Systems |
+| `Manufacturer`   | (Austria Micro Systems) ams AG |
 | `Model`         | AS3935 |
 | `Name`      | (fqdn) e.g., "pimon1.home" |
 | `sofware ver`  | Script Version (e.g., v1.2.0) |
 | `mac addr`       | mac: 00:00:00:00:00:00 |
-| `Ether IP addr`       | eth0: 00.00.00.00 |
-| `WiFi IP addr`       | wlan0: 00.00.00.00 |
+| `IP addr`       | eth0: 00.00.00.00 -OR- wlan0: 00.00.00.00|
 
-(The addreses reported are those of the Raspberry Pi running the script.)
+
+(The addreseses reported are those of the Raspberry Pi running this script.)
 
 ### Readings
 
@@ -40,11 +40,12 @@ This Lightning Detector as a sensor provides the following readings:
 
 | Name            | Description |
 |-----------------|-------------|
-| `temperature`   | System temperature, in [°C] (0.1°C resolution) |
-| `status`         | [on -or- off] |
-| `uptime`      | duration since last booted, as [days] |
-| `updated`  | updates last applied, as [date] |
-| `time`       | total space in [GBytes] |
+| `timestamp`   | date/time of report |
+| `energy`         | engery for this report |
+| `distance`      | distance to storm front |
+| `count`      | # detections since last report |
+
+(*from the datasheet*: If the received signal is classified as lightning, the energy is calculated. This value is just a pure number and has no physical meaning.)
 
 ## Prerequisites
 
@@ -112,15 +113,20 @@ This can be done by running it as a daemon.
    
 ## Integration
 
-Detection values will be published to the (configurable) MQTT broker topic "`raspberrypi/{sensorName}`" (e.g. `raspberrypi/lightning01`).
+Detection values will be published to the (configurable) MQTT broker topic "`home/nodes/{sensorName}`" (e.g. `home/nodes/lightning01`).
 
 An example:
 
 ```json
-{"temperature": 52.1, "status": "ON", "uptime": 184, "updated": 06Jun20, "fs-size": 64, "fs-avail": 13.5 }
+{"energy": 200546, "distance": 5, "timestamp": 2020-04-05T08:15:30-05:00, "count": 1 }
 ```
 
-This data can then be subscribed to and processed by your home assistant installation.  Want to go further?  Shortly there will be a new Lovelace card specifically for visualizing lightning data. **Watch this space**
+This data can then be subscribed to and processed by your home assistant installation.  
+
+### Lovelace Card
+Want to go further?  Shortly there will be a new *Lovelace card* specifically for visualizing lightning data. 
+
+**--Coming Soon--**
 
 ## Credits
 Thank you to "Hexalyse" for providing the starting logic for this effort. His project which i had tweeting (yes, in french) locally here in Colorado when i was first bringing up my hardware is [LightningTweeter](https://github.com/Hexalyse/LightningTweeter)
