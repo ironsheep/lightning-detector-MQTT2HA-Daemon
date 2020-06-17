@@ -1,0 +1,20 @@
+[Unit]
+Description=ISP AS3935 Lightning Detector MQTT Client/Daemon
+Documentation=https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon
+After=network.target mosquitto.service
+
+[Service]
+Type=notify
+User=daemon
+Group=daemon
+WorkingDirectory=/opt/ISP-lightning-mqtt-daemon/
+ExecStart=/usr/bin/python3 /opt/ISP-lightning-mqtt-daemon/ISP-lightning-mqtt-daemon.py
+StandardOutput=null
+#StandardOutput=syslog
+#SyslogIdentifier=ISPliDet
+StandardError=journal
+Environment=PYTHONUNBUFFERED=true
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
