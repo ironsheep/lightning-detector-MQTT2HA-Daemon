@@ -3,7 +3,7 @@
 [![GitHub Release][releases-shield]][releases]
 [![GitHub Activity][commits-shield]][commits]
 
-[![Project Maintenance][maintenance-shield]
+![Project Maintenance][maintenance-shield]
 
 
 A simple Linux python script to monitor the AS3935 Lightning Detector attach to the RPi on which it is running and report information from the detector via MQTT to your Home Assistant installation.
@@ -164,9 +164,13 @@ Thank you to also Thomas Dietrich for providing a wonderful pattern for this pro
 ### [Copyright](copyright) | [License](LICENSE)
 
 
-[commits-shield]: https://img.shields.io/github/ironsheep/lightning-detector-MQTT2HA-Daemon.svg?style=for-the-badge
+[commits-shield]: https://img.shields.io/github/commit-activity/y/ironsheep/lightning-detector-MQTT2HA-Daemon.svg?style=for-the-badge
 [commits]: https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon/commits/master
+
 [license-shield]: https://img.shields.io/github/ironsheep/lightning-detector-MQTT2HA-Daemon.svg?style=for-the-badge
+
 [maintenance-shield]: https://img.shields.io/badge/maintainer-S%20M%20Moraco%20%40ironsheepbiz-blue.svg?style=for-the-badge
-[releases-shield]: https://img.shields.io/github/ironsheep/lightning-detector-MQTT2HA-Daemon.svg?style=for-the-badge
+
+[releases-shield]: https://img.shields.io/github/release/ironsheep/lightning-detector-MQTT2HA-Daemon.svg?style=for-the-badge
 [releases]: https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon/releases
+
