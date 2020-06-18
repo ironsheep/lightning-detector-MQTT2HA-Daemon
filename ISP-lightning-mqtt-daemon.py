@@ -215,7 +215,7 @@ detectorValues = OrderedDict([
 
 print_line('Announcing Lightning Detection device to MQTT broker for auto-discovery ...')
 #for [sensor_name, sensor_dict] in detectorValues.items():
-state_topic = '{}/sensor/{}/state'.format(base_topic, sensor_name.lower())
+state_topic = '{}/sensor/{}/detect'.format(base_topic, sensor_name.lower())
 settings_topic = '{}/sensor/{}/settings'.format(base_topic, sensor_name.lower())
 
 for [sensor, params] in detectorValues.items():
@@ -252,7 +252,7 @@ pin = intr_pin
 # Rev. 1 Raspberry Pis should leave bus set at 0, while rev. 2 Pis should set
 # bus equal to 1. The address should be changed to match the address of the
 # detector IC.
-print_line('I2C configuration addr={} - bus={}'.format(i2c_address, i2c_bus))
+print('I2C configuration addr={} - bus={}'.format(i2c_address, i2c_bus))
 
 detector = RPi_AS3935.RPi_AS3935(i2c_address, i2c_bus)
 # Indoors = more sensitive (can miss very strong lightnings)

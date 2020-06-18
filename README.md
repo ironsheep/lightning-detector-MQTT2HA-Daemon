@@ -113,7 +113,7 @@ This can be done by running it as a daemon.
    
 ## Integration
 
-Detection values will be published to the (configurable) MQTT broker topic "`{base_topic}/{sensorName}/state`" (e.g. `home/nodes/lightning01/state`).
+Detection values will be published to the (configurable) MQTT broker topic "`{base_topic}/{sensorName}/detect`" (e.g. `home/nodes/lightning01/detect`).
 
 An example:
 
