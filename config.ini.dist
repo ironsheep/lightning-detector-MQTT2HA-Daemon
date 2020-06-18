@@ -5,7 +5,7 @@
 # Some settings can be configured by environment variables.
 # If an env variable is set, it takes precedence over settings in this file
 
-[General
+[General]
 
 
 [Daemon]

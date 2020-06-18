@@ -2,8 +2,7 @@
 # -*- coding: utf-8 -*-
 from RPi_AS3935 import RPi_AS3935
 import RPi.GPIO as GPIO
-import thread
-import time
+import _thread
 from datetime import datetime
 
 import socket
@@ -139,12 +138,15 @@ detector_min_strikes = config['Sensor'].get('detector_min_strikes', default_dete
 print_line('Configuration accepted', console=False, sd_notify=True)
 
 # MQTT connection
+lwt_topic = '{}/sensor/{}/connected'.format(base_topic, sensor_name.lower())
+
+
 print_line('Connecting to MQTT broker ...')
 mqtt_client = mqtt.Client()
 mqtt_client.on_connect = on_connect
 mqtt_client.on_publish = on_publish
 
-mqtt_client.will_set('{}/connected'.format(base_topic), payload='0', retain=True)
+mqtt_client.will_set(lwt_topic, payload='0', retain=True)
 
 if config['MQTT'].getboolean('tls', False):
     # According to the docs, setting PROTOCOL_SSLv23 "Selects the highest protocol version
@@ -170,7 +172,7 @@ except:
     print_line('MQTT connection error. Please check your settings in the configuration file "config.ini"', error=True, sd_notify=True)
     sys.exit(1)
 else:
-    mqtt_client.publish('{}/connected'.format(base_topic), payload='1', retain=True)
+    mqtt_client.publish(lwt_topic, payload='1', retain=True)
     mqtt_client.loop_start()
     sleep(1.0) # some slack to establish the connection
 
@@ -183,7 +185,7 @@ LD_DISTANCE = "distance"   # 5b value: 1=overhead, 63(0x3f)=out-of-range, 2-62 d
 LD_COUNT = "count"   # 5b value: 1=overhead, 63(0x3f)=out-of-range, 2-62 dist in km
 
 LDS_MIN_STRIKES = "min_strikes" # 1,5,9,16
-LDS_LOCATION = "location" # indoors, outdoors
+LDS_LOCATION = "afe_inside" # indoors, outdoors
 LDS_LCO_ON_INT = "disp_lco" # T/F where T means LCO is transmitting on Intr pin (can't detect when this is true)
 LDS_NOISE_FLOOR = "noise_floor" # [0-7]
 
@@ -225,7 +227,7 @@ for [sensor, params] in detectorValues.items():
         payload['device_class'] = params['device_class']
     payload['state_topic'] = state_topic
     payload['value_template'] = "{{{{ value_json.{} }}}}".format(sensor)
-    if 'device_ident' in sensor_dict:
+    if 'device_ident' in params:
         payload['device'] = {
                 'identifiers' : ["{}".format(uniqID)],
                 'connections' : [["mac", mac.lower()], [interface, ipaddr]],
@@ -238,7 +240,7 @@ for [sensor, params] in detectorValues.items():
          payload['device'] = {
                 'identifiers' : ["{}".format(uniqID)],
          }
-    mqtt_client.publish(discovery_topic, json.dumps(payload), 1, True)
+    mqtt_client.publish(discovery_topic, json.dumps(payload), 1, retain=True)
 
 
 
@@ -249,16 +251,18 @@ GPIO.setmode(GPIO.BCM)
 pin = intr_pin
 # Rev. 1 Raspberry Pis should leave bus set at 0, while rev. 2 Pis should set
 # bus equal to 1. The address should be changed to match the address of the
-# sensor.
-sensor = RPi_AS3935(address=i2c_address, bus=i2c_bus)
+# detector IC.
+print_line('I2C configuration addr={} - bus={}'.format(i2c_address, i2c_bus))
+
+detector = RPi_AS3935.RPi_AS3935(i2c_address, i2c_bus)
 # Indoors = more sensitive (can miss very strong lightnings)
 # Outdoors = less sensitive (can miss far away lightnings)
-sensor.set_indoors(detector_afr_gain_indoor)
-sensor.set_noise_floor(default_detector_noise_floor)
-# Change this value to the tuning value for your sensor
-sensor.calibrate(tun_cap=0x01)
+detector.set_indoors(detector_afr_gain_indoor)
+detector.set_noise_floor(default_detector_noise_floor)
+# Change this value to the tuning value for your detector
+detector.calibrate(tun_cap=0x01)
 # Prevent single isolated strikes from being logged => interrupts begin after 5 strikes, then are fired normally
-sensor.set_min_strikes(detector_min_strikes)
+detector.set_min_strikes(detector_min_strikes)
 
 last_alert = datetime.min
 strikes_since_last_alert = 0
@@ -269,57 +273,58 @@ strikes_since_last_alert = 0
 #def send_tweet(tweet):
 #   #api.update_status(tweet)
 
-def send_settings(minStrikes, isIndoors, isDispLco, noiseFloor)
+def send_settings(minStrikes, isIndoors, isDispLco, noiseFloor):
     settingsData = OrderedDict()
     settingsData[LDS_MIN_STRIKES] = minStrikes
     settingsData[LDS_LOCATION] = isIndoors
     settingsData[LDS_LCO_ON_INT] = isDispLco
     settingsData[LDS_NOISE_FLOOR] = noiseFloor
 
-    print_line('Publishing to MQTT topic "{}, Data:{}"'.format(settings_topic, json.dumps(data)))
-    mqtt_client.publish('{}'.format(settings_topic), json.dumps(settingsData))
+    print_line('Publishing to MQTT topic "{}, Data:{}"'.format(settings_topic, json.dumps(settingsData)))
+    mqtt_client.publish('{}'.format(settings_topic), json.dumps(settingsData), 1, retain=False)
     sleep(0.5) # some slack for the publish roundtrip and callback function
 
-def send_status(timestamp, energy, distance, strikeCount)
-    data = OrderedDict()
-    data[LD_TIMESTAMP] = timestamp
-    data[LD_ENERGY] = energy
-    data[LD_DISTANCE] = distance
+def send_status(timestamp, energy, distance, strikeCount):
+    statusData = OrderedDict()
+    statusData[LD_TIMESTAMP] = timestamp.astimezone().replace(microsecond=0).isoformat()
+    statusData[LD_ENERGY] = energy
+    statusData[LD_DISTANCE] = distance
+    statusData[LD_COUNT] = strikeCount
 
-    print_line('Publishing to MQTT topic "{}, Data:{}"'.format(state_topic, json.dumps(data)))
-    mqtt_client.publish('{}'.format(state_topic), json.dumps(data))
+    print_line('Publishing to MQTT topic "{}, Data:{}"'.format(state_topic, json.dumps(statusData)))
+    mqtt_client.publish('{}'.format(state_topic), json.dumps(statusData), 1, retain=False)
     sleep(0.5) # some slack for the publish roundtrip and callback function
 
 # Interrupt handler
 def handle_interrupt(channel):
     global last_alert
     global strikes_since_last_alert
-    global sensor
+    global detector
     current_timestamp = datetime.now()
-    time.sleep(0.003)
-    reason = sensor.get_interrupt()
+    sleep(0.003)
+    reason = detector.get_interrupt()
     if reason == 0x01:
         print("Noise level too high - adjusting")
-        sensor.raise_noise_floor()
+        detector.raise_noise_floor()
     elif reason == 0x04:
         print("Disturber detected. Masking subsequent disturbers")
-        sensor.set_mask_disturber(True)
+        detector.set_mask_disturber(True)
     elif reason == 0x08:
         print("We sensed lightning! (%s)" % current_timestamp.strftime('%H:%M:%S - %Y/%m/%d'))
         if (current_timestamp - last_alert).seconds < 3:
             print("Last strike is too recent, incrementing counter since last alert.")
             strikes_since_last_alert += 1
             return
-        distance = sensor.get_distance()
-        energy = sensor.get_energy()
+        distance = detector.get_distance()
+        energy = detector.get_energy()
         print("Energy: " + str(energy) + " - distance: " + str(distance) + "km")
         # Yes, it tweets in French. Baguette.
-        thread.start_new_thread(send_status, (current_timestamp, energy, distance, strikes_since_last_alert + 1))
+        _thread.start_new_thread(send_status, (current_timestamp, energy, distance, strikes_since_last_alert + 1))
         strikes_since_last_alert = 0
         last_alert = current_timestamp
     # If no strike has been detected for the last hour, reset the strikes_since_last_alert (consider storm finished)
     if (current_timestamp - last_alert).seconds > 1800 and last_alert != datetime.min:
-        #thread.start_new_thread(send_tweet, (
+        #_thread.start_new_thread(send_tweet, (
         #        "\o/ Orage terminé. Aucun nouvel éclair détecté depuis 1/2h.",))
         strikes_since_last_alert = 0
         last_alert = datetime.min
@@ -327,15 +332,15 @@ def handle_interrupt(channel):
 
 # Use a software Pull-Down on interrupt pin
 GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-sensor.set_mask_disturber(False)
+detector.set_mask_disturber(False)
 
 # post setup data, once per run
 settingsData = OrderedDict()
-min_strikes = sensor.get_min_strikes()
-indoors = sensor.get_indoors()
-disp_lco = sensor.get_disp_lco()
-noise_floor = sensor.get_noise_floor()
-thread.start_new_thread(send_settings, (min_strikes, indoors, disp_lco, noise_floor))
+min_strikes = detector.get_min_strikes()
+indoors = detector.get_indoors()
+disp_lco = detector.get_disp_lco()
+noise_floor = detector.get_noise_floor()
+_thread.start_new_thread(send_settings, (min_strikes, indoors, disp_lco, noise_floor))
 
 # now configure for run in main loop
 GPIO.add_event_detect(pin, GPIO.RISING, callback=handle_interrupt)
@@ -343,8 +348,8 @@ print("Waiting for lightning - or at least something that looks like it")
 
 try:
     while True:
-        # Read/clear the sensor data every 10s in case we missed an interrupt (interrupts happening too fast ?)
-        time.sleep(10)
+        # Read/clear the detector data every 10s in case we missed an interrupt (interrupts happening too fast ?)
+        sleep(10)
         handle_interrupt(pin)
 finally:
     # cleanup used pins... just because we like cleaning up after us

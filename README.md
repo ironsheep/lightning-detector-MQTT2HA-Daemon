@@ -113,15 +113,21 @@ This can be done by running it as a daemon.
    
 ## Integration
 
-Detection values will be published to the (configurable) MQTT broker topic "`home/nodes/{sensorName}`" (e.g. `home/nodes/lightning01`).
+Detection values will be published to the (configurable) MQTT broker topic "`{base_topic}/{sensorName}/state`" (e.g. `home/nodes/lightning01/state`).
 
 An example:
 
 ```json
-{"energy": 200546, "distance": 5, "timestamp": 2020-04-05T08:15:30-05:00, "count": 1 }
+{"timestamp": "2020-06-17T20:06:44-06:00", "energy": 303184, "distance": 1, "count": 1}
 ```
 
 This data can then be subscribed to and processed by your home assistant installation.  
+
+Additionally, the detector settings are written to: "`{base_topic}/{sensorName}/settings`" with the following fields:
+
+```json
+{"min_strikes": 5, "afe_inside": true, "disp_lco": false, "noise_floor": 1}
+```
 
 ### Lovelace Card
 Want to go further?  Shortly there will be a new *Lovelace card* specifically for visualizing lightning data. 
