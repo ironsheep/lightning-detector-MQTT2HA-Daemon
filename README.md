@@ -3,7 +3,7 @@ A simple Linux python script to monitor the AS3935 Lightning Detector attach to 
 
 With this new sensor and a new Lovelace card you can monitor lightning presence in your local area.
 
-
+![Discovered by Home Assistant](Docs/images/AsDiscovered.png)
 
 This script can be configured to be run in **daemon mode** continously in the background as a systemd service.
 

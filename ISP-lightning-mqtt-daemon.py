@@ -26,7 +26,7 @@ import sdnotify
 from signal import signal, SIGPIPE, SIG_DFL
 signal(SIGPIPE,SIG_DFL)
 
-script_version = "0.1"
+script_version = "1.0.0"
 project_name = 'lightning-detector-MQTT2HA-Daemon'
 project_url = 'https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon'
 
@@ -179,7 +179,7 @@ else:
 sd_notifier.notify('READY=1')
 
 # our lighting device
-LD_TIMESTAMP = "timestamp"
+LD_TIMESTAMP = "last"
 LD_ENERGY = "energy"    # 21b value unsigned
 LD_DISTANCE = "distance"   # 5b value: 1=overhead, 63(0x3f)=out-of-range, 2-62 dist in km
 LD_COUNT = "count"   # 5b value: 1=overhead, 63(0x3f)=out-of-range, 2-62 dist in km
@@ -207,7 +207,7 @@ uniqID = "AS3935-{}".format(mac.lower().replace(":", ""))
 
 # Publish our MQTT auto discovery
 detectorValues = OrderedDict([
-    (LD_TIMESTAMP, dict(title="TimeStamp", device_class="timestamp", device_ident="yes")),
+    (LD_TIMESTAMP, dict(title="Last", device_class="timestamp", device_ident="yes")),
     (LD_ENERGY, dict(title="Energy")),
     (LD_DISTANCE, dict(title="Distance")),
     (LD_COUNT, dict(title="Count")),
