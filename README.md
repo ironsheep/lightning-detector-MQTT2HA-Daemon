@@ -1,7 +1,6 @@
 # lightning-detector-MQTT2HA-Daemon
 
 ![Project Maintenance][maintenance-shield]
-[![License][license-shield]](LICENSE)
 
 A simple Linux python script to monitor the AS3935 Lightning Detector attach to the RPi on which it is running and report information from the detector via MQTT to your Home Assistant installation.
 
