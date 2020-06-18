@@ -1,5 +1,5 @@
-# Configuration file for Xiaomi Mi Flora Plant Sensor MQTT Client/Daemon
-# Source: https://github.com/ThomDietrich/miflora-mqtt-daemon
+# Configuration file for lightning-detector-MQTT2HA-Daemon
+# Source: https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon
 #
 # Uncomment and adapt all settings as needed.
 # Some settings can be configured by environment variables.

@@ -81,7 +81,9 @@ vim /ISP-lightning-mqtt-daemon/config.ini
 
 ## Execution
 
-A first test run is as easy as:
+When you are ready to test your adjustments to the config.ini file you can start an MQTT monitor tool to see what your newly adjusted script will do. (I use [MQTTBox](http://workswithweb.com/mqttbox.html) to monitor all my MQTT testing.)
+
+Once you are ready to monitor then a first test run is as easy as:
 
 ```shell
 python3 /opt/ISP-lightning-mqtt-daemon/ISP-lightning-mqtt-daemon.py
@@ -96,6 +98,16 @@ python3 /opt/ISP-lightning-mqtt-daemon/ISP-lightning-mqtt-daemon.py --config /op
 
 ### Run as Daemon / Service
 
+>      ** CAUTION **
+>   
+>      Run as daemon is NOT YET working correctly. i'll be posting an update
+>      as soon as I have the fix to this in place.  For now you can run from 
+>      command-line which works but - as a daemon it is not yet starting.   
+>
+>         MORE SOON!
+>       
+>      ** CAUTION **
+   
 You probably want to execute this script **continuously in the background**.
 This can be done by running it as a daemon.
 
@@ -104,7 +116,7 @@ This can be done by running it as a daemon.
 - via Systemd service - on systemd managed systems (the **recommended** option)
 
    ```shell
-   sudo cp /opt/ISP-RPi-mqtt-daemon/template.service /etc/systemd/system/isp-lightning.service
+   sudo ln -s /opt/ISP-RPi-mqtt-daemon/isp-lightning.service /etc/systemd/system/isp-lightning.service
 
    sudo systemctl daemon-reload
 

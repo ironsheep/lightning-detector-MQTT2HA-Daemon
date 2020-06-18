@@ -26,7 +26,7 @@ import sdnotify
 from signal import signal, SIGPIPE, SIG_DFL
 signal(SIGPIPE,SIG_DFL)
 
-script_version = "1.0.0"
+script_version = "1.1.0"
 project_name = 'lightning-detector-MQTT2HA-Daemon'
 project_url = 'https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon'
 
@@ -71,7 +71,7 @@ def clean_identifier(name):
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
         print_line('MQTT connection established', console=True, sd_notify=True)
-        print()
+        print_line('')  # blank line?!
     else:
         print_line('Connection error with result code {} - {}'.format(str(rc), mqtt.connack_string(rc)), error=True)
         #kill main thread
@@ -209,7 +209,7 @@ uniqID = "AS3935-{}".format(mac.lower().replace(":", ""))
 detectorValues = OrderedDict([
     (LD_TIMESTAMP, dict(title="Last", device_class="timestamp", device_ident="yes")),
     (LD_ENERGY, dict(title="Energy")),
-    (LD_DISTANCE, dict(title="Distance")),
+    (LD_DISTANCE, dict(title="Distance", unit="km")),
     (LD_COUNT, dict(title="Count")),
 ])
 
@@ -225,6 +225,8 @@ for [sensor, params] in detectorValues.items():
     payload['unique_id'] = "{}_{}".format(uniqID, sensor.title().lower())
     if 'device_class' in params:
         payload['device_class'] = params['device_class']
+    if 'unit' in params:
+        payload['unit_of_measurement'] = params['unit']
     payload['state_topic'] = state_topic
     payload['value_template'] = "{{{{ value_json.{} }}}}".format(sensor)
     if 'device_ident' in params:
@@ -252,7 +254,7 @@ pin = intr_pin
 # Rev. 1 Raspberry Pis should leave bus set at 0, while rev. 2 Pis should set
 # bus equal to 1. The address should be changed to match the address of the
 # detector IC.
-print('I2C configuration addr={} - bus={}'.format(i2c_address, i2c_bus))
+print_line('I2C configuration addr={} - bus={}'.format(i2c_address, i2c_bus))
 
 detector = RPi_AS3935.RPi_AS3935(i2c_address, i2c_bus)
 # Indoors = more sensitive (can miss very strong lightnings)
@@ -304,20 +306,20 @@ def handle_interrupt(channel):
     sleep(0.003)
     reason = detector.get_interrupt()
     if reason == 0x01:
-        print("Noise level too high - adjusting")
+        print_line("Noise level too high - adjusting")
         detector.raise_noise_floor()
     elif reason == 0x04:
-        print("Disturber detected. Masking subsequent disturbers")
+        print_line("Disturber detected. Masking subsequent disturbers")
         detector.set_mask_disturber(True)
     elif reason == 0x08:
-        print("We sensed lightning! (%s)" % current_timestamp.strftime('%H:%M:%S - %Y/%m/%d'))
+        print_line("We sensed lightning! (%s)" % current_timestamp.strftime('%H:%M:%S - %Y/%m/%d'))
         if (current_timestamp - last_alert).seconds < 3:
-            print("Last strike is too recent, incrementing counter since last alert.")
+            print_line("Last strike is too recent, incrementing counter since last alert.")
             strikes_since_last_alert += 1
             return
         distance = detector.get_distance()
         energy = detector.get_energy()
-        print("Energy: " + str(energy) + " - distance: " + str(distance) + "km")
+        print_line("Energy: " + str(energy) + " - distance: " + str(distance) + "km")
         # Yes, it tweets in French. Baguette.
         _thread.start_new_thread(send_status, (current_timestamp, energy, distance, strikes_since_last_alert + 1))
         strikes_since_last_alert = 0
@@ -344,7 +346,7 @@ _thread.start_new_thread(send_settings, (min_strikes, indoors, disp_lco, noise_f
 
 # now configure for run in main loop
 GPIO.add_event_detect(pin, GPIO.RISING, callback=handle_interrupt)
-print("Waiting for lightning - or at least something that looks like it")
+print_line("Waiting for lightning - or at least something that looks like it")
 
 try:
     while True:
