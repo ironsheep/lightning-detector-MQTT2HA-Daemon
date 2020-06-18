@@ -171,6 +171,6 @@ Thank you to also Thomas Dietrich for providing a wonderful pattern for this pro
 [commits-shield]: https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon.svg?style=for-the-badge
 [commits]: https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon/commits/master
 [license-shield]: https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon.svg?style=for-the-badge
-[maintenance-shield]: https://img.shields.io/badge/maintainer-Ian%20Richardson%20%40iantrich-blue.svg?style=for-the-badge
-[releases-shield]: https://img.shields.io/github/release/custom-components/sensor.trakt.svg?style=for-the-badge
+[maintenance-shield]: https://img.shields.io/badge/maintainer-Stephen%20Moraco%20%40ironsheep-blue.svg?style=for-the-badge
+[releases-shield]: https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon.svg?style=for-the-badge
 [releases]: https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon/releases
