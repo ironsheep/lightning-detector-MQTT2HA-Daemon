@@ -164,3 +164,13 @@ Thank you to also Thomas Dietrich for providing a wonderful pattern for this pro
 
 
 ### [Copyright](copyright) | [License](LICENSE)
+
+
+[buymecoffee]: https://www.buymeacoffee.com/iantrich
+[buymecoffeebadge]: https://img.shields.io/badge/buy%20me%20a%20coffee-donate-yellow.svg?style=for-the-badge
+[commits-shield]: https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon.svg?style=for-the-badge
+[commits]: https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon/commits/master
+[license-shield]: https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon.svg?style=for-the-badge
+[maintenance-shield]: https://img.shields.io/badge/maintainer-Ian%20Richardson%20%40iantrich-blue.svg?style=for-the-badge
+[releases-shield]: https://img.shields.io/github/release/custom-components/sensor.trakt.svg?style=for-the-badge
+[releases]: https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon/releases
