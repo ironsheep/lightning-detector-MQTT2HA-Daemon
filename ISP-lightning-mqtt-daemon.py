@@ -106,13 +106,19 @@ sleep_period = config['Daemon'].getint('period', 10)
 
 
 # Script Accumulation and reporting behavior
+min_period_in_minutes = 2
+max_period_in_minutes = 10
 default_period_in_minutes = 5   # [2-10]
-period_in_minutes = config['Behavior'].get('period_in_minutes', default_period_in_minutes)
+period_in_minutes = int(config['Behavior'].get('period_in_minutes', default_period_in_minutes))
 
+min_number_of_rings = 3 
+max_number_of_rings = 7
 default_number_of_rings = 5 # [3-7]
-number_of_rings = config['Behavior'].get('number_of_rings', default_number_of_rings)
+number_of_rings = int(config['Behavior'].get('number_of_rings', default_number_of_rings))
 
-default_distance_as = 'km'  # [km|mi]
+val_distance_as_km = 'km'
+val_distance_as_mi = 'km'
+default_distance_as = val_distance_as_km  # [km|mi]
 distance_as = config['Behavior'].get('distance_as', default_distance_as)
 
 
@@ -120,47 +126,61 @@ distance_as = config['Behavior'].get('distance_as', default_distance_as)
 #  I2c = GPIO2/pin3/SDA, GPIO3/pin5/SCL
 #  SPI = GPI10/pin19/MOSI, GPIO9/pin21/MISO, GPIO11/pin23/SCLK, GPIO8/pin24/CE0, GPIO7/pin26/CE1
 default_intr_pin = 17   # any GPIO pin not used for comms with chip
-intr_pin = config['Sensor'].get('intr_pin', default_intr_pin)
+intr_pin = int(config['Sensor'].get('intr_pin', default_intr_pin))
 
 default_i2c_bus = 1
 default_i2c_address = 0x03
 
-i2c_bus = config['Sensor'].get('i2c_bus', default_i2c_bus)
-i2c_address = config['Sensor'].get('i2c_address', default_i2c_address)
+i2c_bus = int(config['Sensor'].get('i2c_bus', default_i2c_bus))
+i2c_address = int(config['Sensor'].get('i2c_address', default_i2c_address))
 
 default_detector_afr_gain_indoor = True
 detector_afr_gain_indoor = config['Sensor'].get('detector_afr_gain_indoor', default_detector_afr_gain_indoor)
 
 # noise_floor (0-7)
 default_detector_noise_floor = 1
-detector_noise_floor = config['Sensor'].get('detector_noise_floor', default_detector_noise_floor)
+detector_noise_floor = int(config['Sensor'].get('detector_noise_floor', default_detector_noise_floor))
 
 # number of strikes (def: 5, value 1,5,9,16), then are fired normally.
 default_detector_min_strikes = 5
-detector_min_strikes = config['Sensor'].get('detector_min_strikes', default_detector_min_strikes)
+detector_min_strikes = int(config['Sensor'].get('detector_min_strikes', default_detector_min_strikes))
 
 #  FIXME: UNONE - let's add value VALIDATION!!!
 
 # Check configuration
 #
 #
-if not config['Sensor']:
-    print_line('No sensor info found in configuration file "config.ini"', error=True, sd_notify=True)
+if (period_in_minutes < min_period_in_minutes) or (period_in_minutes > max_period_in_minutes):
+    print_line('ERROR: Invalid "period_in_minutes" found in configuration file: "config.ini"! Must be [{}-{}] Fix and try again... Aborting'.format(min_period_in_minutes, max_period_in_minutes), error=True, sd_notify=True)
+    sys.exit(1)   
+
+if (number_of_rings < min_number_of_rings) or (number_of_rings > max_number_of_rings):
+    print_line('ERROR: Invalid "number_of_rings" found in configuration file: "config.ini"! Must be [{}-{}] Fix and try again... Aborting'.format(min_number_of_rings, max_number_of_rings), error=True, sd_notify=True)
+    sys.exit(1)   
+
+if (distance_as != val_distance_as_km) and (distance_as != val_distance_as_mi):
+    print_line('ERROR: Invalid "distance_as" found in configuration file: "config.ini"! Must be ["{}" or "{}"] Fix and try again... Aborting'.format(val_distance_as_km, val_distance_as_mi), error=True, sd_notify=True)
+    sys.exit(1)   
+
+### Ensure required values within sections of our config are present
+if not config['MQTT']:
+    print_line('ERROR: No MQTT settings found in configuration file "config.ini"! Fix and try again... Aborting', error=True, sd_notify=True)
     sys.exit(1)
 
 
 print_line('Configuration accepted', console=False, sd_notify=True)
 
 # MQTT connection
-lwt_topic = '{}/sensor/{}/connected'.format(base_topic, sensor_name.lower())
-
+lwt_topic = '{}/sensor/{}/status'.format(base_topic, sensor_name.lower())
+lwt_online_val = 'Online'
+lwt_offline_val = 'Offline'
 
 print_line('Connecting to MQTT broker ...')
 mqtt_client = mqtt.Client()
 mqtt_client.on_connect = on_connect
 mqtt_client.on_publish = on_publish
 
-mqtt_client.will_set(lwt_topic, payload='Offline', retain=True)
+mqtt_client.will_set(lwt_topic, payload=lwt_offline_val, retain=True)
 
 if config['MQTT'].getboolean('tls', False):
     # According to the docs, setting PROTOCOL_SSLv23 "Selects the highest protocol version
@@ -186,7 +206,7 @@ except:
     print_line('MQTT connection error. Please check your settings in the configuration file "config.ini"', error=True, sd_notify=True)
     sys.exit(1)
 else:
-    mqtt_client.publish(lwt_topic, payload='Online', retain=True)
+    mqtt_client.publish(lwt_topic, payload=lwt_online_val, retain=True)
     mqtt_client.loop_start()
     sleep(1.0) # some slack to establish the connection
 
@@ -234,20 +254,27 @@ detectorValues = OrderedDict([
 print_line('Announcing Lightning Detection device to MQTT broker for auto-discovery ...')
 #for [sensor_name, sensor_dict] in detectorValues.items():
 base_topic = '{}/sensor/{}'.format(base_topic, sensor_name.lower())
-state_topic = '~/detect'
-settings_topic = '~/settings'
-activity_topic = '~/status'     # vs. LWT
-command_topic = '~/set'
+settings_topic = '{}/settings'.format(base_topic)
+crings_topic = '{}/crings'.format(base_topic)    # vs. LWT
+prings_topic = '{}/prings'.format(base_topic)    # vs. LWT
+
+state_topic_rel = '{}/detect'.format('~')
+state_topic = '{}/detect'.format(base_topic)
+
+activity_topic_rel = '{}/status'.format('~')     # vs. LWT
+activity_topic = '{}/status'.format(base_topic)    # vs. LWT
+
+command_topic_rel = '~/set'
 
 
 for [sensor, params] in detectorValues.items():
     discovery_topic = 'homeassistant/sensor/{}/{}/config'.format(sensor_name.lower(), sensor)
     payload = OrderedDict()
     if 'no_title_prefix' in params:
-        payload['name'] = "{}".format(sensor.title())
+        payload['name'] = "{}".format(params['title'].title())
     else:
-        payload['name'] = "{} {}".format(sensor_name, sensor.title())
-    payload['uniq_id'] = "{}_{}".format(uniqID, sensor.title().lower())
+        payload['name'] = "{} {}".format(sensor_name.title(), params['title'].title())
+    payload['uniq_id'] = "{}_{}".format(uniqID, sensor.lower())
     if 'device_class' in params:
         payload['dev_cla'] = params['device_class']
     if 'unit' in params:
@@ -256,12 +283,12 @@ for [sensor, params] in detectorValues.items():
         payload['stat_t'] = "~/{}".format(sensor)
         payload['val_tpl'] = "{{{{ value_json.{}.timestamp }}}}".format(sensor)
     else:
-        payload['stat_t'] = state_topic
+        payload['stat_t'] = state_topic_rel
         payload['val_tpl'] = "{{{{ value_json.{} }}}}".format(sensor)
     payload['~'] = base_topic
-    payload['pl_avail'] =  1
-    payload['pl_NOT_avail'] = 0
-    payload['avty_t'] = activity_topic
+    payload['pl_avail'] = lwt_online_val
+    payload['pl_not_avail'] = lwt_offline_val
+    payload['avty_t'] = activity_topic_rel
     if 'json_values' in params:
         payload['json_attr_t'] = "~/{}".format(sensor)
         payload['json_attr_tpl'] = '{{{{ value_json.{} | tojson }}}}'.format(sensor)
@@ -286,7 +313,7 @@ for [sensor, params] in detectorValues.items():
 GPIO.setmode(GPIO.BCM)
 
 # pin used for interrupts
-pin = intr_pin
+
 # Rev. 1 Raspberry Pis should leave bus set at 0, while rev. 2 Pis should set
 # bus equal to 1. The address should be changed to match the address of the
 # detector IC.
@@ -317,7 +344,6 @@ def send_settings(minStrikes, isIndoors, isDispLco, noiseFloor):
     settingsData[LDS_LOCATION] = isIndoors
     settingsData[LDS_LCO_ON_INT] = isDispLco
     settingsData[LDS_NOISE_FLOOR] = noiseFloor
-
     print_line('Publishing to MQTT topic "{}, Data:{}"'.format(settings_topic, json.dumps(settingsData)))
     mqtt_client.publish('{}'.format(settings_topic), json.dumps(settingsData), 1, retain=False)
     sleep(0.5) # some slack for the publish roundtrip and callback function
@@ -369,6 +395,7 @@ def handle_interrupt(channel):
 
 
 # Use a software Pull-Down on interrupt pin
+pin = int(intr_pin)
 GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 detector.set_mask_disturber(False)
 

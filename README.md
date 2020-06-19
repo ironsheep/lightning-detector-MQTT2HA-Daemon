@@ -155,7 +155,12 @@ Detection values will be published to the (configurable) MQTT broker topic "`{ba
 An example:
 
 ```json
-{"timestamp": "2020-06-17T20:06:44-06:00", "energy": 303184, "distance": 1, "count": 1}
+{
+  "last": "2020-06-19T17:26:22-06:00",
+  "energy": 96098,
+  "distance": 1,
+  "count": 1
+}
 ```
 
 This data can then be subscribed to and processed by your home assistant installation.  
@@ -163,7 +168,12 @@ This data can then be subscribed to and processed by your home assistant install
 Additionally, the detector settings are written to: "`{base_topic}/{sensorName}/settings`" with the following fields:
 
 ```json
-{"min_strikes": 5, "afe_inside": true, "disp_lco": false, "noise_floor": 1}
+{
+  "min_strikes": 5,
+  "afe_inside": true,
+  "disp_lco": false,
+  "noise_floor": 1
+}
 ```
 
 Lastly, there are two additional topics published which are used to drive our new **Lovelace card**. These are:
