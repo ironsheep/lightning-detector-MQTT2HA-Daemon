@@ -54,8 +54,23 @@ This Lightning Detector as a sensor provides the following readings:
 
 An MQTT broker is needed as the counterpart for this daemon.
 
-MQTT is huge help in connecting different parts of your smart home and setting up of a broker is quick and easy. In many cases you've already set one up when you installed Home Assistant.
+MQTT is huge help in connecting different parts of your smart home and setting up of a broker is quick and easy. In many cases you've already set one up when you installed Home Assistant.  
 
+You'll need to know the hostname (or IP address) of the machine where the MQTT broker is running as well as the port it is listening to. This is typically the default MQTT port.
+
+### Wiring AS3935 to Raspberry Pi
+You'll also need the AS3935 Lightning sensor connected (via I2C for now) to the RPi.  Here's the pinout I use:
+
+| AS3935 Pin      | Module Pin | Raspberry Pi Pin |
+|-----------------|------------|------------------|
+| 4 (GND)         | GND        | 9 (Ground) |
+| 5 (VDD)         | VCC        | 1 (3.3v) |
+| 10 (IRQ)        | IRQ        | 11 (GPIO 17) |
+| 11 (I2CL)       | SCL        | 5 (SCL) |
+| 13 (I2CD)       | SDA / MOSI | 3 (SDA) |
+
+(You can use a different GPIO pin for the IRQ, but remember to change your config.ini:**intr_pin = 17** value to the GPIO # you choose.)
+ 
 ## Installation
 
 On a modern Linux system just a few steps are needed to get the daemon working.
@@ -144,21 +159,21 @@ Additionally, the detector settings are written to: "`{base_topic}/{sensorName}/
 {"min_strikes": 5, "afe_inside": true, "disp_lco": false, "noise_floor": 1}
 ```
 
-### Lovelace Card
-Want to go further?  Shortly there will be a new *Lovelace card* specifically for visualizing lightning data. 
 
-**--Coming Soon--**
+## Lovelace Card for Home Assistant
+Want to go further?  Shortly there will be a new [Lovelace Lightning Detector Card](https://github.com/ironsheep/lovelace-lightning-detector-card) specifically for visualizing lightning data. We are working on it now... Watch that project for further updates.
+
 
 ## Credits
 Thank you to "Hexalyse" for providing the starting logic for this effort. His project which i had tweeting (yes, in french) locally here in Colorado when i was first bringing up my hardware is [LightningTweeter](https://github.com/Hexalyse/LightningTweeter)
 
 Thank you to also Thomas Dietrich for providing a wonderful pattern for this project. His project, which I use and heartily recommend, is [miflora-mqtt-deamon](https://github.com/ThomDietrich/miflora-mqtt-daemon)
 
-----
 
 
 ## Disclaimer and Legal
 
+----
 > *Raspberry Pi* is registered trademark of *Raspberry Pi (Trading) Ltd.*
 >
 > This project is a community project not for commercial use.
