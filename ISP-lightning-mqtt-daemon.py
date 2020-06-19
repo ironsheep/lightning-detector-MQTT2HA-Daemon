@@ -32,7 +32,7 @@ project_url = 'https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon'
 
 if False:
     # will be caught by python 2.7 to be illegal syntax
-    print('Sorry, this script requires a python3 runtime environment.', file=sys.stderr)
+    print_line('Sorry, this script requires a python3 runtime environment.', file=sys.stderr)
 
 
 # Argparse
@@ -100,11 +100,26 @@ default_sensor_name = 'lightningdetector'
 
 base_topic = config['MQTT'].get('base_topic', default_base_topic).lower()
 sensor_name = config['MQTT'].get('sensor_name', default_sensor_name).lower()
+
+# Read/clear the detector data every 10s in case we missed an interrupt (interrupts happening too fast ?)
 sleep_period = config['Daemon'].getint('period', 10)
 
 
+# Script Accumulation and reporting behavior
+default_period_in_minutes = 5   # [2-10]
+period_in_minutes = config['Behavior'].get('period_in_minutes', default_period_in_minutes)
+
+default_number_of_rings = 5 # [3-7]
+number_of_rings = config['Behavior'].get('number_of_rings', default_number_of_rings)
+
+default_distance_as = 'km'  # [km|mi]
+distance_as = config['Behavior'].get('distance_as', default_distance_as)
+
+
 # GPIO pin used for interrupts
-default_intr_pin = 17
+#  I2c = GPIO2/pin3/SDA, GPIO3/pin5/SCL
+#  SPI = GPI10/pin19/MOSI, GPIO9/pin21/MISO, GPIO11/pin23/SCLK, GPIO8/pin24/CE0, GPIO7/pin26/CE1
+default_intr_pin = 17   # any GPIO pin not used for comms with chip
 intr_pin = config['Sensor'].get('intr_pin', default_intr_pin)
 
 default_i2c_bus = 1
@@ -129,10 +144,9 @@ detector_min_strikes = config['Sensor'].get('detector_min_strikes', default_dete
 # Check configuration
 #
 #
-#    TBA
-#if not config['Sensors']:
-#    print_line('No sensors found in configuration file "config.ini"', error=True, sd_notify=True)
-#    sys.exit(1)
+if not config['Sensor']:
+    print_line('No sensor info found in configuration file "config.ini"', error=True, sd_notify=True)
+    sys.exit(1)
 
 
 print_line('Configuration accepted', console=False, sd_notify=True)
@@ -146,7 +160,7 @@ mqtt_client = mqtt.Client()
 mqtt_client.on_connect = on_connect
 mqtt_client.on_publish = on_publish
 
-mqtt_client.will_set(lwt_topic, payload='0', retain=True)
+mqtt_client.will_set(lwt_topic, payload='Offline', retain=True)
 
 if config['MQTT'].getboolean('tls', False):
     # According to the docs, setting PROTOCOL_SSLv23 "Selects the highest protocol version
@@ -172,7 +186,7 @@ except:
     print_line('MQTT connection error. Please check your settings in the configuration file "config.ini"', error=True, sd_notify=True)
     sys.exit(1)
 else:
-    mqtt_client.publish(lwt_topic, payload='1', retain=True)
+    mqtt_client.publish(lwt_topic, payload='Online', retain=True)
     mqtt_client.loop_start()
     sleep(1.0) # some slack to establish the connection
 
@@ -183,6 +197,8 @@ LD_TIMESTAMP = "last"
 LD_ENERGY = "energy"    # 21b value unsigned
 LD_DISTANCE = "distance"   # 5b value: 1=overhead, 63(0x3f)=out-of-range, 2-62 dist in km
 LD_COUNT = "count"   # 5b value: 1=overhead, 63(0x3f)=out-of-range, 2-62 dist in km
+LD_CURRENT_RINGS = "crings"
+LD_PAST_RINGS = "prings"
 
 LDS_MIN_STRIKES = "min_strikes" # 1,5,9,16
 LDS_LOCATION = "afe_inside" # indoors, outdoors
@@ -209,28 +225,48 @@ uniqID = "AS3935-{}".format(mac.lower().replace(":", ""))
 detectorValues = OrderedDict([
     (LD_TIMESTAMP, dict(title="Last", device_class="timestamp", device_ident="yes")),
     (LD_ENERGY, dict(title="Energy")),
-    (LD_DISTANCE, dict(title="Distance", unit="km")),
+    (LD_DISTANCE, dict(title="Distance", unit=distance_as)),
     (LD_COUNT, dict(title="Count")),
+    (LD_CURRENT_RINGS, dict(title="Current Rings", no_title_prefix="yes", json_values="yes")),
+    (LD_PAST_RINGS, dict(title="Past Rings", no_title_prefix="yes", json_values="yes"))
 ])
 
 print_line('Announcing Lightning Detection device to MQTT broker for auto-discovery ...')
 #for [sensor_name, sensor_dict] in detectorValues.items():
-state_topic = '{}/sensor/{}/detect'.format(base_topic, sensor_name.lower())
-settings_topic = '{}/sensor/{}/settings'.format(base_topic, sensor_name.lower())
+base_topic = '{}/sensor/{}'.format(base_topic, sensor_name.lower())
+state_topic = '~/detect'
+settings_topic = '~/settings'
+activity_topic = '~/status'     # vs. LWT
+command_topic = '~/set'
+
 
 for [sensor, params] in detectorValues.items():
     discovery_topic = 'homeassistant/sensor/{}/{}/config'.format(sensor_name.lower(), sensor)
     payload = OrderedDict()
-    payload['name'] = "{} {}".format(sensor_name, sensor.title())
-    payload['unique_id'] = "{}_{}".format(uniqID, sensor.title().lower())
+    if 'no_title_prefix' in params:
+        payload['name'] = "{}".format(sensor.title())
+    else:
+        payload['name'] = "{} {}".format(sensor_name, sensor.title())
+    payload['uniq_id'] = "{}_{}".format(uniqID, sensor.title().lower())
     if 'device_class' in params:
-        payload['device_class'] = params['device_class']
+        payload['dev_cla'] = params['device_class']
     if 'unit' in params:
         payload['unit_of_measurement'] = params['unit']
-    payload['state_topic'] = state_topic
-    payload['value_template'] = "{{{{ value_json.{} }}}}".format(sensor)
+    if 'json_values' in params:
+        payload['stat_t'] = "~/{}".format(sensor)
+        payload['val_tpl'] = "{{{{ value_json.{}.timestamp }}}}".format(sensor)
+    else:
+        payload['stat_t'] = state_topic
+        payload['val_tpl'] = "{{{{ value_json.{} }}}}".format(sensor)
+    payload['~'] = base_topic
+    payload['pl_avail'] =  1
+    payload['pl_NOT_avail'] = 0
+    payload['avty_t'] = activity_topic
+    if 'json_values' in params:
+        payload['json_attr_t'] = "~/{}".format(sensor)
+        payload['json_attr_tpl'] = '{{{{ value_json.{} | tojson }}}}'.format(sensor)
     if 'device_ident' in params:
-        payload['device'] = {
+        payload['dev'] = {
                 'identifiers' : ["{}".format(uniqID)],
                 'connections' : [["mac", mac.lower()], [interface, ipaddr]],
                 'manufacturer' : '(Austria Micro Systems) ams AG',
@@ -239,7 +275,7 @@ for [sensor, params] in detectorValues.items():
                 'sw_version': "v{}".format(script_version)
         }
     else:
-         payload['device'] = {
+         payload['dev'] = {
                 'identifiers' : ["{}".format(uniqID)],
          }
     mqtt_client.publish(discovery_topic, json.dumps(payload), 1, retain=True)
@@ -351,7 +387,7 @@ print_line("Waiting for lightning - or at least something that looks like it")
 try:
     while True:
         # Read/clear the detector data every 10s in case we missed an interrupt (interrupts happening too fast ?)
-        sleep(10)
+        sleep(sleep_period)
         handle_interrupt(pin)
 finally:
     # cleanup used pins... just because we like cleaning up after us

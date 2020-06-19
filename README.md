@@ -2,9 +2,11 @@
 
 ![Project Maintenance][maintenance-shield]
 
-A simple Linux python script to monitor the AS3935 Lightning Detector attach to the RPi on which it is running and report information from the detector via MQTT to your Home Assistant installation.
+A simple Linux python script to monitor the AS3935 Lightning Detector attached to the Raspberry Pi on which it is running and report information from the detector via MQTT to your Home Assistant installation.
 
-With this new sensor and an upcoming new Lovelace card you can monitor lightning presence in your local area.
+With this new sensor and an upcoming new **Lovelace card** (links below) you can monitor lightning presence in your local area.
+
+When this script/daemon is run it will broadcast discovery topics via MQTT decribing this new sensor to home assistant.  If you have MQTT Discovery enabled then this new sensor will appear as a new device in Home Assistant: (where the "Firmware: v...." will be the version number of this script that you've just set up.)
 
 ![Discovered by Home Assistant](Docs/images/AsDiscovered.png)
 
@@ -29,8 +31,8 @@ The AS3935 Lightning Detector monitored by this script is reported as:
 |-----------------|-------------|
 | `Manufacturer`   | (Austria Micro Systems) ams AG |
 | `Model`         | AS3935 |
-| `Name`      | (fqdn) e.g., "pimon1.home" |
-| `sofware ver`  | Script Version (e.g., v1.2.0) |
+| `Name`      | (fqdn) e.g., "mypi.home" |
+| `sofware ver`  | Script Version (e.g., v1.0.0) |
 | `mac addr`       | mac: 00:00:00:00:00:00 |
 | `IP addr`       | eth0: 00.00.00.00 -OR- wlan0: 00.00.00.00|
 
@@ -44,11 +46,11 @@ This Lightning Detector as a sensor provides the following readings:
 | Name            | Description |
 |-----------------|-------------|
 | `timestamp`   | date/time of report |
-| `energy`         | engery for this report |
+| `energy`         | "energy" for this report * |
 | `distance`      | distance to storm front |
 | `count`      | # detections since last report |
 
-(*from the datasheet*: If the received signal is classified as lightning, the energy is calculated. This value is just a pure number and has no physical meaning.)
+\* (*from the datasheet*: If the received signal is classified as lightning, the energy is calculated. *This value is just a pure number and has no physical meaning*.)
 
 ## Prerequisites
 
@@ -56,7 +58,8 @@ An MQTT broker is needed as the counterpart for this daemon.
 
 MQTT is huge help in connecting different parts of your smart home and setting up of a broker is quick and easy. In many cases you've already set one up when you installed Home Assistant.  
 
-You'll need to know the hostname (or IP address) of the machine where the MQTT broker is running as well as the port it is listening to. This is typically the default MQTT port.
+You'll need to know the hostname (or IP address) of the machine where the MQTT broker is running as well as the port it is listening to. This is typically the default MQTT port (1883).  
+*You will add this information to the config.ini for this script, as described below.*
 
 ### Wiring AS3935 to Raspberry Pi
 You'll also need the AS3935 Lightning sensor connected (via I2C for now) to the RPi.  Here's the pinout I use:
@@ -112,7 +115,7 @@ python3 /opt/ISP-lightning-mqtt-daemon/ISP-lightning-mqtt-daemon.py --config /op
 
 
 ### Run as Daemon / Service
-
+----
 >      ** CAUTION **
 >   
 >      Run as daemon is NOT YET working correctly. i'll be posting an update
@@ -122,7 +125,9 @@ python3 /opt/ISP-lightning-mqtt-daemon/ISP-lightning-mqtt-daemon.py --config /op
 >         MORE SOON!
 >       
 >      ** CAUTION **
-   
+
+----
+
 You probably want to execute this script **continuously in the background**.
 This can be done by running it as a daemon.
 
@@ -141,6 +146,8 @@ This can be done by running it as a daemon.
    sudo systemctl enable isp-lightning.service
    ```
    
+   *NOTE: we use a symbolic link 'ln -s' so that when you list the files in /etc/systemd/system the link will point back to where your project in installed.  You'll see that many of your packages do this.*
+   
 ## Integration
 
 Detection values will be published to the (configurable) MQTT broker topic "`{base_topic}/{sensorName}/detect`" (e.g. `home/nodes/lightning01/detect`).
@@ -158,6 +165,11 @@ Additionally, the detector settings are written to: "`{base_topic}/{sensorName}/
 ```json
 {"min_strikes": 5, "afe_inside": true, "disp_lco": false, "noise_floor": 1}
 ```
+
+Lastly, there are two additional topics published which are used to drive our new **Lovelace card**. These are:
+
+- "`{base_topic}/{sensorName}/crings`" - which posts the live status of current period, updated at each new strike
+- "`{base_topic}/{sensorName}/prings`" - which posts the status of the preceeding full period, updated at the end of a period
 
 
 ## Lovelace Card for Home Assistant
