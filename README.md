@@ -8,7 +8,7 @@ With this new sensor and an upcoming new **Lovelace card** (links below) you can
 
 When this script/daemon is run it will broadcast discovery topics via MQTT decribing this new sensor to home assistant.  If you have MQTT Discovery enabled then this new sensor will appear as a new device in Home Assistant: (where the "Firmware: v...." will be the version number of this script that you've just set up.)
 
-![Discovered by Home Assistant](Docs/images/AsDiscovered.png)
+![Discovered by Home Assistant](Docs/images/DiscoveryV1.2.png)
 
 This script can be configured to be run in **daemon mode** continously in the background as a systemd service.
 

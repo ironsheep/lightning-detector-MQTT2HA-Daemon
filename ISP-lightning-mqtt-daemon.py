@@ -243,12 +243,12 @@ uniqID = "AS3935-{}".format(mac.lower().replace(":", ""))
 
 # Publish our MQTT auto discovery
 detectorValues = OrderedDict([
-    (LD_TIMESTAMP, dict(title="Last", device_class="timestamp", device_ident="yes")),
+    (LD_TIMESTAMP, dict(title="Last", device_class="timestamp", device_ident="Lightning Detector")),
     (LD_ENERGY, dict(title="Energy")),
     (LD_DISTANCE, dict(title="Distance", unit=distance_as)),
     (LD_COUNT, dict(title="Count")),
-    (LD_CURRENT_RINGS, dict(title="Current Rings", no_title_prefix="yes", json_values="yes")),
-    (LD_PAST_RINGS, dict(title="Past Rings", no_title_prefix="yes", json_values="yes"))
+    (LD_CURRENT_RINGS, dict(title="Current RingSet", device_class="timestamp", no_title_prefix="yes", json_values="yes")),
+    (LD_PAST_RINGS, dict(title="Past RingSet", device_class="timestamp", no_title_prefix="yes", json_values="yes"))
 ])
 
 print_line('Announcing Lightning Detection device to MQTT broker for auto-discovery ...')
@@ -297,7 +297,7 @@ for [sensor, params] in detectorValues.items():
                 'identifiers' : ["{}".format(uniqID)],
                 'connections' : [["mac", mac.lower()], [interface, ipaddr]],
                 'manufacturer' : '(Austria Micro Systems) ams AG',
-                'name' : sensor_name,
+                'name' : params['device_ident'],
                 'model' : 'Lightning Detector (AS3935)',
                 'sw_version': "v{}".format(script_version)
         }
