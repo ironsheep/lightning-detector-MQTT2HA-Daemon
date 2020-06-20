@@ -55,6 +55,17 @@
 # Path to TLS client auth certificate file
 #tls_certfile =
 
+[Behavior]
+
+# This script accumulates detections into buckets (rings if you will) for this period of time in minutes [Default: 5]
+#period_in_minutes = 5
+
+# This script accumulates values into 3-7 rings [Default: 5]
+#number_of_rings = 5
+
+# This script can report distances in miles or kilometers (mi, km) [Default: km]
+#distance_as = km
+
 [Sensor]
 
 # decribe how your sensor is hooked up to your RPi
