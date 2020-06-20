@@ -61,7 +61,7 @@ MQTT is huge help in connecting different parts of your smart home and setting u
 You'll need to know the hostname (or IP address) of the machine where the MQTT broker is running as well as the port it is listening to. This is typically the default MQTT port (1883).  
 *You will add this information to the config.ini for this script, as described below.*
 
-### Wiring AS3935 to Raspberry Pi
+### Connecting the AS3935 to your Raspberry Pi
 You'll also need the AS3935 Lightning sensor connected (via I2C for now) to the RPi.  Here's the pinout I use:
 
 | AS3935 Pin      | Module Pin | Raspberry Pi Pin |

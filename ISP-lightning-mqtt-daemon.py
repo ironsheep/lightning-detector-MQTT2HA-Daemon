@@ -26,7 +26,7 @@ import sdnotify
 from signal import signal, SIGPIPE, SIG_DFL
 signal(SIGPIPE,SIG_DFL)
 
-script_version = "1.1.0"
+script_version = "1.2.0"
 project_name = 'lightning-detector-MQTT2HA-Daemon'
 project_url = 'https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon'
 
@@ -309,6 +309,10 @@ for [sensor, params] in detectorValues.items():
 
 
 
+# -----------------------------------------------------------------------------
+#  Ready our AS3935 connected via I2c for use...
+# -----------------------------------------------------------------------------
+
 # Initialize GPIO
 GPIO.setmode(GPIO.BCM)
 
@@ -333,10 +337,9 @@ last_alert = datetime.min
 strikes_since_last_alert = 0
 
 
-# We use a function to send tweet so that we can run it in a different thread and avoid spending too much time in the
-# interrupt handle
-#def send_tweet(tweet):
-#   #api.update_status(tweet)
+# -----------------------------------------------------------------------------
+#  MQTT Transmit Helper Routines
+# -----------------------------------------------------------------------------
 
 def send_settings(minStrikes, isIndoors, isDispLco, noiseFloor):
     settingsData = OrderedDict()
@@ -358,6 +361,193 @@ def send_status(timestamp, energy, distance, strikeCount):
     print_line('Publishing to MQTT topic "{}, Data:{}"'.format(state_topic, json.dumps(statusData)))
     mqtt_client.publish('{}'.format(state_topic), json.dumps(statusData), 1, retain=False)
     sleep(0.5) # some slack for the publish roundtrip and callback function
+
+
+# -----------------------------------------------------------------------------
+#  Strike Accumulator Routines
+# -----------------------------------------------------------------------------
+
+
+# ring keys
+STRIKE_COUNT_KEY = 'count'
+DISTANCE_KEY = 'distance'
+ENERGY_KEY = 'energy'
+TOTAL_ENERGY_KEY = 'total_energy'   #internal
+ACCUM_COUNT_KEY = 'accumulated_count'   #internal
+# top keys
+RING_PREFIX_KEY = 'ring'
+UNITS_KEY = 'units'
+PERIOD__IN_MINUTES_KEY = 'period_minutes'
+TIMESTAMP_KEY = 'timestamp'
+LAST_DETECT_KEY = 'last'
+OUT_OF_RANGE_KEY = 'outofrange'
+RING_COUNT_KEY = 'ring_count'
+RING_WIDTH_KEY = 'ring_width'
+
+
+# master list names
+CURR_RINGS_KEY = 'crings'
+PAST_RINGS_KEY = 'prings'
+
+
+
+accumulatorBinIndexSets = []
+accumulatorBinIndexSets.append( list(( 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3 )) )   # indexes when 3 bins
+accumulatorBinIndexSets.append( list(( 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4 )) )   # indexes when 4 bins
+accumulatorBinIndexSets.append( list(( 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5 )) )   # indexes when 5 bins
+accumulatorBinIndexSets.append( list(( 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 6, 6, 6 )) )   # indexes when 6 bins
+accumulatorBinIndexSets.append( list(( 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7 )) )   # indexes when 7 bins
+if len(accumulatorBinIndexSets) != max_number_of_rings - min_number_of_rings + 1:
+      raise TypeError("[CODE] to support {} to {} rows we must have {} index-sets!!  Aborting!")
+
+distanceValueToIndexList = list(( 1, 5, 6, 8, 10, 12, 14, 17, 20, 24, 27, 31, 34, 37, 40, 63 ))
+if len(distanceValueToIndexList) != 16:
+      raise TypeError("[CODE] the distanceValueToIndexList must have 16 entries!!  Aborting!")
+
+# calculate the index to the indexSet we need based on current settings and get the list
+binIndexList = number_of_rings - min_number_of_rings
+binIndexesForThisRun = accumulatorBinIndexSets[binIndexList]
+# ensure the list is proper sized
+
+if len(binIndexesForThisRun) != 14:
+      raise TypeError("a bin index-set must have 14 entries!!  Aborting!")
+
+#  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, OOR (out of range)
+#
+#  1, 5, 6, 8, 10, 12, 14, 17, 20, 24, 27, 31, 34, 37, 40, 63   # value from sensor
+#  0, 1, 2, 3, 4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15   # our internal value
+#
+#  3-7 bins + overhead + OOR
+
+accumulatorBins = []
+accumulatorLastStrike = ''
+accumulatorOutOfRangeCount = 0
+accumulatorBinDistances = []
+
+def init_empty_accumulator():
+    global accumulatorBins
+    global accumulatorLastStrike
+    global accumulatorOutOfRangeCount
+    # first empty our list if it wasn't
+    accumulatorBins.clear
+    # allocate an empty dictionary for each bin we need
+    accumulatorBins = list( {} for i in list(range(number_of_rings + 1)) )  # n rings + 1 for "overhead" (out of range is just counted)
+    # and reset these values
+    accumulatorOutOfRangeCount = 0
+    accumulatorLastStrike = ''
+
+def calculate_ring_widths():
+    global accumulatorBinDistances
+    # first empty our list if it wasn't
+    accumulatorBinDistances.clear
+    # place a zero for each bin we need
+    accumulatorBinDistances = list( 0 for i in list(range(number_of_rings + 1)) )  # n rings + 1 for "overhead" (out of range is just counted)
+    # FIXME: UNDONE now let's calculate the value for each bin
+    #  ring 1 starts at 5km so subtract that initially but add it back in for each except overhead
+    binWidth = (40 - 5) / number_of_rings;
+    for ringIndex in range(number_of_rings + 1):
+        if ringIndex == 0:
+            accumulatorBinDistances[ringIndex] = 0
+        else:
+            accumulatorBinDistances[ringIndex] = (binWidth * (ringIndex - 1)) + 5
+
+def binIndexFromDistance(distance):
+    try:
+        desiredBinIndex = distanceValueToIndexList.index(distance)
+    except ValueError:
+        raise TypeError("[CODE] WHAT?? Unexpected Value from detector [{}]!!  Aborting!".format(distance))
+    return desiredBinIndex
+
+
+def accumulate(timestamp, energy, distance, strikeCount):
+    global accumulatorBins
+    global accumulatorLastStrike
+    global accumulatorOutOfRangeCount
+    desiredBinIndex = binIndexFromDistance(distance)
+    accumulatorLastStrike = timestamp
+    if desiredBinIndex == 15:
+        accumulatorOutOfRangeCount += 1
+    else:
+        desiredBin = accumulatorBins[desiredBinIndex]
+        if STRIKE_COUNT_KEY in desiredBin:
+            currCount = desiredBin[STRIKE_COUNT_KEY]
+        else:
+            currCount = 0
+        if TOTAL_ENERGY_KEY in desiredBin:
+            currTotalEnergy = desiredBin[TOTAL_ENERGY_KEY] 
+        else:
+            currTotalEnergy = 0
+        if ACCUM_COUNT_KEY in desiredBin:
+            currAccumCount = desiredBin[ACCUM_COUNT_KEY] 
+        else:
+            currAccumCount = 0
+
+        currTotalEnergy += energy
+        currAccumCount += 1
+        currCount += strikeCount
+
+        # real values for consumer  
+        desiredBin[STRIKE_COUNT_KEY] = currCount
+        desiredBin[ENERGY_KEY] = int(currTotalEnergy / currAccumCount)
+        # internal values so we can accumulate correctly
+        desiredBin[TOTAL_ENERGY_KEY] = currTotalEnergy
+        desiredBin[ACCUM_COUNT_KEY] = currAccumCount   
+
+def getDictionaryForAccumulatorNamed(dictionaryName):
+    global accumulatorBins
+    global accumulatorLastStrike
+    global accumulatorOutOfRangeCount
+    # build a past dictionary and send it
+    pastRingsData = OrderedDict()
+
+    current_timestamp = datetime.now()
+    pastRingsData[TIMESTAMP_KEY] = current_timestamp.astimezone().replace(microsecond=0).isoformat()
+    pastRingsData[LAST_DETECT_KEY] = accumulatorLastStrike.astimezone().replace(microsecond=0).isoformat()
+    pastRingsData[PERIOD__IN_MINUTES_KEY] = period_in_minutes
+    pastRingsData[UNITS_KEY] = distance_as
+    pastRingsData[OUT_OF_RANGE_KEY] = accumulatorOutOfRangeCount
+    pastRingsData[RING_COUNT_KEY] = number_of_rings    
+    pastRingsData[RING_WIDTH_KEY] = 40 / number_of_rings
+
+    for ringIndex in range(number_of_rings + 1):
+        binForThisRing = accumulatorBins[ringIndex]
+        singleRingData = OrderedDict()
+        if STRIKE_COUNT_KEY in binForThisRing:
+            singleRingData[STRIKE_COUNT_KEY] = binForThisRing[STRIKE_COUNT_KEY]
+        else:
+            singleRingData[STRIKE_COUNT_KEY] = 0
+        singleRingData[DISTANCE_KEY] = accumulatorBinDistances[ringIndex] 
+        if ENERGY_KEY in binForThisRing:
+            singleRingData[ENERGY_KEY] = binForThisRing[ENERGY_KEY]
+        else:
+            singleRingData[ENERGY_KEY] = 0
+        ringName = "ring{}".format(ringIndex)
+        pastRingsData[ringName] = singleRingData
+
+    topRingsData = OrderedDict()
+    topRingsData[dictionaryName] = pastRingsData
+    return topRingsData
+
+def put_accumulated_aside_and_report_it(topic):
+    # build a past dictionary and send it
+    topRingsData = getDictionaryForAccumulatorNamed(PAST_RINGS_KEY)
+
+    print_line('Publishing to MQTT topic "{}, Data:{}"'.format(topic, json.dumps(topRingsData)))
+    mqtt_client.publish('{}'.format(topic), json.dumps(topRingsData), 1, retain=False)
+    sleep(0.5) # some slack for the publish roundtrip and callback function
+    # reset the current
+    init_empty_accumulator()
+
+def report_current_accumulator(topic):
+    # build a current dictionary and send it
+    topRingsData = getDictionaryForAccumulatorNamed(CURR_RINGS_KEY)
+
+    print_line('Publishing to MQTT topic "{}, Data:{}"'.format(topic, json.dumps(topRingsData)))
+    mqtt_client.publish('{}'.format(topic), json.dumps(topRingsData), 1, retain=False)
+    sleep(0.5) # some slack for the publish roundtrip and callback function
+
+# -----------------------------------------------------------------------------
+
 
 # Interrupt handler
 def handle_interrupt(channel):
@@ -381,18 +571,32 @@ def handle_interrupt(channel):
             return
         distance = detector.get_distance()
         energy = detector.get_energy()
+        strikes_since_last_alert += 1
         print_line("Energy: " + str(energy) + " - distance: " + str(distance) + "km")
-        # Yes, it tweets in French. Baguette.
-        _thread.start_new_thread(send_status, (current_timestamp, energy, distance, strikes_since_last_alert + 1))
+
+        # if we are past the end of this period then snap it and start accumulating all over
+        if (current_timestamp - last_alert).seconds > period_in_minutes * 60 and last_alert != datetime.min:
+            put_accumulated_aside_and_report_it(prings_topic)
+
+        # ok, report our new detection to MQTT
+        _thread.start_new_thread(send_status, (current_timestamp, energy, distance, strikes_since_last_alert))
+        #  and let's accumulate this detection
+        accumulate(current_timestamp, energy, distance, strikes_since_last_alert)
+        report_current_accumulator(crings_topic)
+        # setup for next...
         strikes_since_last_alert = 0
         last_alert = current_timestamp
+
+
     # If no strike has been detected for the last hour, reset the strikes_since_last_alert (consider storm finished)
     if (current_timestamp - last_alert).seconds > 1800 and last_alert != datetime.min:
         #_thread.start_new_thread(send_tweet, (
-        #        "\o/ Orage terminé. Aucun nouvel éclair détecté depuis 1/2h.",))
+        #        "\o/ Thunderstorm over. No new flash detected for last 1/2h.",))
         strikes_since_last_alert = 0
         last_alert = datetime.min
 
+init_empty_accumulator()
+calculate_ring_widths()
 
 # Use a software Pull-Down on interrupt pin
 pin = int(intr_pin)
