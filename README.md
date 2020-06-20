@@ -205,6 +205,12 @@ Thank you to also Thomas Dietrich for providing a wonderful pattern for this pro
 
 ----
 
+## License
+
+Copyright © 2020 Iron Sheep Productions, LLC. All rights reserved.<br>
+Licensed under the GPL 3 License.<br>
+<br>
+Follow these links for more information:
 
 ### [Copyright](copyright) | [License](LICENSE)
 
