@@ -2,6 +2,8 @@
 
 ![Project Maintenance][maintenance-shield]
 
+
+
 A simple Linux python script to monitor the AS3935 Lightning Detector attached to the Raspberry Pi on which it is running and report information from the detector via MQTT to your Home Assistant installation.
 
 With this new sensor and an upcoming new **Lovelace card** (links below) you can monitor lightning presence in your local area.
@@ -12,6 +14,11 @@ When this script/daemon is run it will broadcast discovery topics via MQTT decri
 
 This script can be configured to be run in **daemon mode** continously in the background as a systemd service.
 
+## Support
+
+Hey dude! Help me out for a :coffee: or :pizza:!
+
+[![coffee](https://www.buymeacoffee.com/assets/img/custom_images/black_img.png)](https://www.buymeacoffee.com/ironsheep)
 
 ## Features
 * Tested on Raspberry Pi's 3 & 4 with Buster - but really should work on any.
