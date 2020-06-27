@@ -26,7 +26,7 @@ import sdnotify
 from signal import signal, SIGPIPE, SIG_DFL
 signal(SIGPIPE,SIG_DFL)
 
-script_version = "1.2.0"
+script_version = "1.3.0"
 project_name = 'lightning-detector-MQTT2HA-Daemon'
 project_url = 'https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon'
 
@@ -212,6 +212,11 @@ else:
 
 sd_notifier.notify('READY=1')
 
+
+# -----------------------------------------------------------------------------
+#  Perform our MQTT Discovery Announcement...
+# -----------------------------------------------------------------------------
+
 # our lighting device
 LD_TIMESTAMP = "last"
 LD_ENERGY = "energy"    # 21b value unsigned
@@ -226,10 +231,7 @@ LDS_LCO_ON_INT = "disp_lco" # T/F where T means LCO is transmitting on Intr pin 
 LDS_NOISE_FLOOR = "noise_floor" # [0-7]
 
 
-# Discovery Announcement
-
 # what device are we on?
-
 gw = os.popen("ip -4 route show default").read().split()
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.connect((gw[2], 0))
@@ -242,6 +244,7 @@ fqdn = socket.getfqdn()
 uniqID = "AS3935-{}".format(mac.lower().replace(":", ""))
 
 # Publish our MQTT auto discovery
+#  table of key items to publish:
 detectorValues = OrderedDict([
     (LD_TIMESTAMP, dict(title="Last", device_class="timestamp", device_ident="Lightning Detector")),
     (LD_ENERGY, dict(title="Energy")),
@@ -252,7 +255,7 @@ detectorValues = OrderedDict([
 ])
 
 print_line('Announcing Lightning Detection device to MQTT broker for auto-discovery ...')
-#for [sensor_name, sensor_dict] in detectorValues.items():
+
 base_topic = '{}/sensor/{}'.format(base_topic, sensor_name.lower())
 settings_topic = '{}/settings'.format(base_topic)
 crings_topic = '{}/crings'.format(base_topic)    # vs. LWT
@@ -389,27 +392,19 @@ RING_WIDTH_KEY = 'ring_width'
 CURR_RINGS_KEY = 'crings'
 PAST_RINGS_KEY = 'prings'
 
-
-
-accumulatorBinIndexSets = []
-accumulatorBinIndexSets.append( list(( 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3 )) )   # indexes when 3 bins
-accumulatorBinIndexSets.append( list(( 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4 )) )   # indexes when 4 bins
-accumulatorBinIndexSets.append( list(( 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5 )) )   # indexes when 5 bins
-accumulatorBinIndexSets.append( list(( 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 6, 6, 6 )) )   # indexes when 6 bins
-accumulatorBinIndexSets.append( list(( 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7 )) )   # indexes when 7 bins
-if len(accumulatorBinIndexSets) != max_number_of_rings - min_number_of_rings + 1:
-      raise TypeError("[CODE] to support {} to {} rows we must have {} index-sets!!  Aborting!")
+# number of distance values
+MAX_DISTANCE_VALUES = 14
 
 distanceValueToIndexList = list(( 1, 5, 6, 8, 10, 12, 14, 17, 20, 24, 27, 31, 34, 37, 40, 63 ))
-if len(distanceValueToIndexList) != 16:
+if len(distanceValueToIndexList) != 1 + MAX_DISTANCE_VALUES + 1:
       raise TypeError("[CODE] the distanceValueToIndexList must have 16 entries!!  Aborting!")
 
 # calculate the index to the indexSet we need based on current settings and get the list
 binIndexList = number_of_rings - min_number_of_rings
-binIndexesForThisRun = accumulatorBinIndexSets[binIndexList]
+binIndexesForThisRun = list(( 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 ))
 # ensure the list is proper sized
 
-if len(binIndexesForThisRun) != 14:
+if len(binIndexesForThisRun) != MAX_DISTANCE_VALUES:
       raise TypeError("a bin index-set must have 14 entries!!  Aborting!")
 
 #  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, OOR (out of range)
@@ -430,8 +425,8 @@ def init_empty_accumulator():
     global accumulatorOutOfRangeCount
     # first empty our list if it wasn't
     accumulatorBins.clear
-    # allocate an empty dictionary for each bin we need
-    accumulatorBins = list( {} for i in list(range(number_of_rings + 1)) )  # n rings + 1 for "overhead" (out of range is just counted)
+    # allocate an empty dictionary for each bin we need 0 + 1-[3-7] = [4-8 bins]
+    accumulatorBins = list( {} for i in list(range(number_of_rings + 1)) )  # n rings + 1 for "overhead" (out of range(63) is just counted)
     # and reset these values
     accumulatorOutOfRangeCount = 0
     accumulatorLastStrike = ''
@@ -441,7 +436,7 @@ def calculate_ring_widths():
     # first empty our list if it wasn't
     accumulatorBinDistances.clear
     # place a zero for each bin we need
-    accumulatorBinDistances = list( 0 for i in list(range(number_of_rings + 1)) )  # n rings + 1 for "overhead" (out of range is just counted)
+    accumulatorBinDistances = list( 0 for i in list(range(number_of_rings + 1)) )  # n rings + 1 for "overhead" (out of range(63) is just counted)
     # FIXME: UNDONE now let's calculate the value for each bin
     #  ring 1 starts at 5km so subtract that initially but add it back in for each except overhead
     binWidth = (40 - 5) / number_of_rings;
@@ -450,10 +445,28 @@ def calculate_ring_widths():
             accumulatorBinDistances[ringIndex] = 0
         else:
             accumulatorBinDistances[ringIndex] = (binWidth * (ringIndex - 1)) + 5
+    # now set up distance to bin index array lookup table
+    for distanceIndex in range(MAX_DISTANCE_VALUES):    # 0-13
+        reportedDistance = distanceValueToIndexList[distanceIndex + 1]    # [5-40]
+        binIndex = 0
+        for ringIndex in range(number_of_rings + 1):    # [0,1-7 for 7 rings]
+            accumulatorDistance = accumulatorBinDistances[ringIndex]
+            if accumulatorDistance <= reportedDistance:
+                binIndex = ringIndex
+            else:
+                break   # stop, we have our answer
+        binIndexesForThisRun[distanceIndex] = binIndex
+    #print('- distanceValueToIndexList "{}"'.format(distanceValueToIndexList))
+    #print('- accumulatorBinDistances "{}"'.format(accumulatorBinDistances))
+    #print('- binIndexesForThisRun "{}"'.format(binIndexesForThisRun))
 
 def binIndexFromDistance(distance):
     try:
+        # given distance determine index value for it... NOTE: 1=idx-0 and 63=idx-15
         desiredBinIndex = distanceValueToIndexList.index(distance)
+        # if we have 1-14 let's translate it into a ring index value [1-[3-7]]
+        if desiredBinIndex > 0 and desiredBinIndex < 15:
+            desiredBinIndex = binIndexesForThisRun[desiredBinIndex - 1]
     except ValueError:
         raise TypeError("[CODE] WHAT?? Unexpected Value from detector [{}]!!  Aborting!".format(distance))
     return desiredBinIndex
@@ -463,9 +476,11 @@ def accumulate(timestamp, energy, distance, strikeCount):
     global accumulatorBins
     global accumulatorLastStrike
     global accumulatorOutOfRangeCount
+    # convert distance to bin index:
+    #   NOTE: 0 is overhead while 15 is 'out of range'
     desiredBinIndex = binIndexFromDistance(distance)
     accumulatorLastStrike = timestamp
-    if desiredBinIndex == 15:
+    if desiredBinIndex == 15:   # out-of-range
         accumulatorOutOfRangeCount += 1
     else:
         desiredBin = accumulatorBins[desiredBinIndex]
