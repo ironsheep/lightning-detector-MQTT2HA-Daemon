@@ -57,16 +57,16 @@
 
 [Behavior]
 
-# This script accumulates detections into buckets (rings if you will) for this period of time in minutes [Default: 5]
+# This script accumulates detections into buckets (rings if you will) for this period of time [2-10] in minutes [Default: 5]
 #period_in_minutes = 5
 
-# This script accumulates values into 3-7 rings [Default: 5]
+# This script accumulates values into [3-7] rings [Default: 5]
 #number_of_rings = 5
 
 # This script can report distances in miles or kilometers (mi, km) [Default: km]
 #distance_as = km
 
-# This script determines that a storm has ended after this period of time in minutes [Default: 30]
+# This script determines that a storm has ended after this period of time [10-60] in minutes [Default: 30]
 #end_storm_after_minutes = 30
 
 [Sensor]

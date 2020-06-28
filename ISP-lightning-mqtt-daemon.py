@@ -123,7 +123,7 @@ default_end_storm_after_minutes = 30   # [10-60]
 end_storm_after_minutes = int(config['Behavior'].get('end_storm_after_minutes', default_end_storm_after_minutes))
 
 val_distance_as_km = 'km'
-val_distance_as_mi = 'km'
+val_distance_as_mi = 'mi'
 default_distance_as = val_distance_as_km  # [km|mi]
 distance_as = config['Behavior'].get('distance_as', default_distance_as)
 
@@ -576,8 +576,11 @@ def getDictionaryForAccumulatorNamed(dictionaryName):
 
     if distance_as == val_distance_as_km:
         distance_multiplier = 1.0
+        minus_one_value = 1.0
     else:
         distance_multiplier = 0.621371
+        # miles are shown in tenths
+        minus_one_value = distance_multiplier / 10
 
     for ringIndex in range(number_of_rings + 1):
         binForThisRing = accumulatorBins[ringIndex]
@@ -589,11 +592,14 @@ def getDictionaryForAccumulatorNamed(dictionaryName):
         # dstance in km
         singleRingData[DISTANCE_KEY] = accumulatorBinDistances[ringIndex] 
         # distance in desired units
-        singleRingData[FROM_SCALED_KEY] = accumulatorBinDistances[ringIndex] * distance_multiplier
+        fromValue = accumulatorBinDistances[ringIndex] * distance_multiplier
         if ringIndex < number_of_rings:
-            singleRingData[TO_SCALED_KEY] = (accumulatorBinDistances[ringIndex + 1] - 1) * distance_multiplier
+            toValue = (accumulatorBinDistances[ringIndex + 1] * distance_multiplier) - minus_one_value
         else:
-            singleRingData[TO_SCALED_KEY] = 40 * distance_multiplier
+            toValue = 40 * distance_multiplier
+        # round the following to 1 decimal place...
+        singleRingData[FROM_SCALED_KEY] = round(fromValue, 1)
+        singleRingData[TO_SCALED_KEY] = round(toValue, 1)
         if ENERGY_KEY in binForThisRing:
             singleRingData[ENERGY_KEY] = binForThisRing[ENERGY_KEY]
         else:
