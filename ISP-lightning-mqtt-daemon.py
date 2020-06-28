@@ -180,6 +180,47 @@ if not config['MQTT']:
 
 print_line('Configuration accepted', console=False, sd_notify=True)
 
+
+# -----------------------------------------------------------------------------
+#  timer and timer funcs for ALIVE MQTT Notices handling
+# -----------------------------------------------------------------------------
+
+ALIVE_TIMOUT_IN_SECONDS = 60
+
+def aliveTimeoutHandler():
+    print_line('- MQTT TIMER INTERRUPT -')
+    mqtt_client.publish(lwt_topic, payload=lwt_online_val, retain=False)
+
+def startAliveTimer():
+    global aliveTimer
+    global aliveTimerRunningStatus
+    stopAliveTimer()
+    aliveTimer = threading.Timer(ALIVE_TIMOUT_IN_SECONDS, aliveTimeoutHandler) 
+    aliveTimer.start()
+    aliveTimerRunningStatus = True
+    print_line('- started ALIVE timer - every {} seconds'.format(ALIVE_TIMOUT_IN_SECONDS))
+
+def stopAliveTimer():
+    global aliveTimer
+    global aliveTimerRunningStatus
+    aliveTimer.cancel()
+    aliveTimerRunningStatus = False
+    print_line('- stopped ALIVE timer')
+
+def isAliveTimerRunning():
+    global aliveTimerRunningStatus
+    return aliveTimerRunningStatus
+
+# our ALIVE TIMER
+aliveTimer = threading.Timer(ALIVE_TIMOUT_IN_SECONDS, aliveTimeoutHandler) 
+# our BOOL tracking state of ALIVE TIMER
+aliveTimerRunningStatus = False
+
+
+# -----------------------------------------------------------------------------
+#  MQTT setup and startup
+# -----------------------------------------------------------------------------
+
 # MQTT connection
 lwt_topic = '{}/sensor/{}/status'.format(base_topic, sensor_name.lower())
 lwt_online_val = 'Online'
@@ -216,11 +257,14 @@ except:
     print_line('MQTT connection error. Please check your settings in the configuration file "config.ini"', error=True, sd_notify=True)
     sys.exit(1)
 else:
-    mqtt_client.publish(lwt_topic, payload=lwt_online_val, retain=True)
+    mqtt_client.publish(lwt_topic, payload=lwt_online_val, retain=False)
     mqtt_client.loop_start()
     sleep(1.0) # some slack to establish the connection
+    startAliveTimer()
 
 sd_notifier.notify('READY=1')
+
+
 
 
 # -----------------------------------------------------------------------------
@@ -730,4 +774,5 @@ try:
 finally:
     # cleanup used pins... just because we like cleaning up after us
     stopPeriodTimer()   # don't leave this running!
+    stopAliveTimer()
     GPIO.cleanup()
