@@ -5,6 +5,7 @@ import RPi.GPIO as GPIO
 import _thread
 from datetime import datetime
 
+import threading
 import socket
 import os
 import uuid
@@ -116,6 +117,11 @@ max_number_of_rings = 7
 default_number_of_rings = 5 # [3-7]
 number_of_rings = int(config['Behavior'].get('number_of_rings', default_number_of_rings))
 
+min_end_storm_after_minutes = 10
+max_end_storm_after_minutes = 60
+default_end_storm_after_minutes = 30   # [10-60]
+end_storm_after_minutes = int(config['Behavior'].get('end_storm_after_minutes', default_end_storm_after_minutes))
+
 val_distance_as_km = 'km'
 val_distance_as_mi = 'km'
 default_distance_as = val_distance_as_km  # [km|mi]
@@ -152,6 +158,10 @@ detector_min_strikes = int(config['Sensor'].get('detector_min_strikes', default_
 #
 if (period_in_minutes < min_period_in_minutes) or (period_in_minutes > max_period_in_minutes):
     print_line('ERROR: Invalid "period_in_minutes" found in configuration file: "config.ini"! Must be [{}-{}] Fix and try again... Aborting'.format(min_period_in_minutes, max_period_in_minutes), error=True, sd_notify=True)
+    sys.exit(1)   
+
+if (end_storm_after_minutes < min_end_storm_after_minutes) or (end_storm_after_minutes > max_end_storm_after_minutes):
+    print_line('ERROR: Invalid "end_storm_after_minutes" found in configuration file: "config.ini"! Must be [{}-{}] Fix and try again... Aborting'.format(min_end_storm_after_minutes, max_end_storm_after_minutes), error=True, sd_notify=True)
     sys.exit(1)   
 
 if (number_of_rings < min_number_of_rings) or (number_of_rings > max_number_of_rings):
@@ -311,6 +321,43 @@ for [sensor, params] in detectorValues.items():
     mqtt_client.publish(discovery_topic, json.dumps(payload), 1, retain=True)
 
 
+# -----------------------------------------------------------------------------
+#  timer and timer funcs for period handling
+# -----------------------------------------------------------------------------
+
+TIMER_INTERRUPT = (-1)
+
+def periodTimeoutHandler():
+    print_line('- TIMER INTERRUPT -')
+    handle_interrupt(TIMER_INTERRUPT) # '0' means we have a timer interrupt!!!
+
+def startPeriodTimer():
+    global endPeriodTimer
+    global periodTimeRunningStatus
+    stopPeriodTimer()
+    endPeriodTimer = threading.Timer(period_in_minutes * 60.0, periodTimeoutHandler) 
+    endPeriodTimer.start()
+    periodTimeRunningStatus = True
+    print_line('- started PERIOD timer - every {} seconds'.format(period_in_minutes * 60.0))
+
+def stopPeriodTimer():
+    global endPeriodTimer
+    global periodTimeRunningStatus
+    endPeriodTimer.cancel()
+    periodTimeRunningStatus = False
+    print_line('- stopped PERIOD timer')
+
+def isPeriodTimerRunning():
+    global periodTimeRunningStatus
+    return periodTimeRunningStatus
+
+
+
+# our TIMER
+endPeriodTimer = threading.Timer(period_in_minutes * 60.0, periodTimeoutHandler) 
+# our BOOL tracking state of TIMER
+periodTimeRunningStatus = False
+
 
 # -----------------------------------------------------------------------------
 #  Ready our AS3935 connected via I2c for use...
@@ -336,6 +383,7 @@ detector.calibrate(tun_cap=0x01)
 # Prevent single isolated strikes from being logged => interrupts begin after 5 strikes, then are fired normally
 detector.set_min_strikes(detector_min_strikes)
 
+first_alert = datetime.min
 last_alert = datetime.min
 strikes_since_last_alert = 0
 
@@ -373,7 +421,9 @@ def send_status(timestamp, energy, distance, strikeCount):
 
 # ring keys
 STRIKE_COUNT_KEY = 'count'
-DISTANCE_KEY = 'distance'
+DISTANCE_KEY = 'distance_km'
+FROM_SCALED_KEY = 'from_units'
+TO_SCALED_KEY = 'to_units'
 ENERGY_KEY = 'energy'
 TOTAL_ENERGY_KEY = 'total_energy'   #internal
 ACCUM_COUNT_KEY = 'accumulated_count'   #internal
@@ -522,7 +572,12 @@ def getDictionaryForAccumulatorNamed(dictionaryName):
     pastRingsData[UNITS_KEY] = distance_as
     pastRingsData[OUT_OF_RANGE_KEY] = accumulatorOutOfRangeCount
     pastRingsData[RING_COUNT_KEY] = number_of_rings    
-    pastRingsData[RING_WIDTH_KEY] = 40 / number_of_rings
+    pastRingsData[RING_WIDTH_KEY] = (40 - 5) / number_of_rings
+
+    if distance_as == val_distance_as_km:
+        distance_multiplier = 1.0
+    else:
+        distance_multiplier = 0.621371
 
     for ringIndex in range(number_of_rings + 1):
         binForThisRing = accumulatorBins[ringIndex]
@@ -531,7 +586,14 @@ def getDictionaryForAccumulatorNamed(dictionaryName):
             singleRingData[STRIKE_COUNT_KEY] = binForThisRing[STRIKE_COUNT_KEY]
         else:
             singleRingData[STRIKE_COUNT_KEY] = 0
+        # dstance in km
         singleRingData[DISTANCE_KEY] = accumulatorBinDistances[ringIndex] 
+        # distance in desired units
+        singleRingData[FROM_SCALED_KEY] = accumulatorBinDistances[ringIndex] * distance_multiplier
+        if ringIndex < number_of_rings:
+            singleRingData[TO_SCALED_KEY] = (accumulatorBinDistances[ringIndex + 1] - 1) * distance_multiplier
+        else:
+            singleRingData[TO_SCALED_KEY] = 40 * distance_multiplier
         if ENERGY_KEY in binForThisRing:
             singleRingData[ENERGY_KEY] = binForThisRing[ENERGY_KEY]
         else:
@@ -566,49 +628,71 @@ def report_current_accumulator(topic):
 
 # Interrupt handler
 def handle_interrupt(channel):
+    global first_alert
     global last_alert
     global strikes_since_last_alert
     global detector
     current_timestamp = datetime.now()
-    sleep(0.003)
-    reason = detector.get_interrupt()
-    if reason == 0x01:
-        print_line("Noise level too high - adjusting")
-        detector.raise_noise_floor()
-    elif reason == 0x04:
-        print_line("Disturber detected. Masking subsequent disturbers")
-        detector.set_mask_disturber(True)
-    elif reason == 0x08:
-        print_line("We sensed lightning! (%s)" % current_timestamp.strftime('%H:%M:%S - %Y/%m/%d'))
-        if (current_timestamp - last_alert).seconds < 3:
-            print_line("Last strike is too recent, incrementing counter since last alert.")
+    if channel != TIMER_INTERRUPT:
+        # ----------------------------------
+        # have HARDWARE interrupt!
+        sleep(0.003)
+        reason = detector.get_interrupt()
+        if reason == 0x01:
+            print_line("<< INTR(" +str(channel) + ") >> Noise level too high - adjusting")
+            detector.raise_noise_floor()
+        elif reason == 0x04:
+            print_line("<< INTR(" +str(channel) + ") >> Disturber detected. Masking subsequent disturbers")
+            detector.set_mask_disturber(True)
+        elif reason == 0x08:
+            #  we have a detection, let's start our period timer if it's not running already....
+            if isPeriodTimerRunning() == False:
+                startPeriodTimer()  # start our period
+                first_alert = current_timestamp # remember when storm first started
+            print_line("<< INTR(" +str(channel) + ") >> We sensed lightning! (%s)" % current_timestamp.strftime('%H:%M:%S - %Y/%m/%d'))
+            if (current_timestamp - last_alert).seconds < 3:
+                print_line("-- Last strike is too recent, incrementing counter since last alert.")
+                strikes_since_last_alert += 1
+                return
+            distance = detector.get_distance()
+            energy = detector.get_energy()
             strikes_since_last_alert += 1
-            return
-        distance = detector.get_distance()
-        energy = detector.get_energy()
-        strikes_since_last_alert += 1
-        print_line("Energy: " + str(energy) + " - distance: " + str(distance) + "km")
+            print_line("-- Energy: " + str(energy) + " - distance: " + str(distance) + "km")
 
-        # if we are past the end of this period then snap it and start accumulating all over
-        if (current_timestamp - last_alert).seconds > period_in_minutes * 60 and last_alert != datetime.min:
-            put_accumulated_aside_and_report_it(prings_topic)
+            # if we are past the end of this period then snap it and start accumulating all over
+            if (current_timestamp - last_alert).seconds > period_in_minutes * 60 and last_alert != datetime.min:
+                put_accumulated_aside_and_report_it(prings_topic)
+                strikes_since_last_alert = 1    # reset this since count just reported
 
-        # ok, report our new detection to MQTT
-        _thread.start_new_thread(send_status, (current_timestamp, energy, distance, strikes_since_last_alert))
-        #  and let's accumulate this detection
-        accumulate(current_timestamp, energy, distance, strikes_since_last_alert)
-        report_current_accumulator(crings_topic)
-        # setup for next...
+            # ok, report our new detection to MQTT
+            _thread.start_new_thread(send_status, (current_timestamp, energy, distance, strikes_since_last_alert))
+            #  and let's accumulate this detection
+            accumulate(current_timestamp, energy, distance, strikes_since_last_alert)
+            report_current_accumulator(crings_topic)
+            # setup for next...
+            strikes_since_last_alert = 0
+            # remember when most recent strike from this storm happened
+            last_alert = current_timestamp
+    else:
+        # ----------------------------------
+        # have period-end-timer interrupt!
+        #   assume we are at the end of this period, snap it and start accumulating all over
+        print_line("<< INTR(" +str(channel) + ") >> Period ended, waiting for next detection")
+        put_accumulated_aside_and_report_it(prings_topic)
+        # we snapped counters so reset count
         strikes_since_last_alert = 0
-        last_alert = current_timestamp
-
 
     # If no strike has been detected for the last hour, reset the strikes_since_last_alert (consider storm finished)
-    if (current_timestamp - last_alert).seconds > 1800 and last_alert != datetime.min:
+    if (current_timestamp - last_alert).seconds > end_storm_after_minutes * 60 and last_alert != datetime.min:
         #_thread.start_new_thread(send_tweet, (
         #        "\o/ Thunderstorm over. No new flash detected for last 1/2h.",))
+        print_line("<< INTR(" +str(channel) + ") >> Storm ended, waiting for next detection")
+        report_current_accumulator(prings_topic)
+        stopPeriodTimer()   #  kill our timer until our next detection
+        #  reset our indicators
         strikes_since_last_alert = 0
         last_alert = datetime.min
+        first_alert = datetime.min
 
 init_empty_accumulator()
 calculate_ring_widths()
@@ -630,6 +714,8 @@ _thread.start_new_thread(send_settings, (min_strikes, indoors, disp_lco, noise_f
 GPIO.add_event_detect(pin, GPIO.RISING, callback=handle_interrupt)
 print_line("Waiting for lightning - or at least something that looks like it")
 
+# NOTE: we don't start our timer here... we wait until first detection!
+
 try:
     while True:
         # Read/clear the detector data every 10s in case we missed an interrupt (interrupts happening too fast ?)
@@ -637,4 +723,5 @@ try:
         handle_interrupt(pin)
 finally:
     # cleanup used pins... just because we like cleaning up after us
+    stopPeriodTimer()   # don't leave this running!
     GPIO.cleanup()

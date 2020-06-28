@@ -66,6 +66,9 @@
 # This script can report distances in miles or kilometers (mi, km) [Default: km]
 #distance_as = km
 
+# This script determines that a storm has ended after this period of time in minutes [Default: 30]
+#end_storm_after_minutes = 30
+
 [Sensor]
 
 # decribe how your sensor is hooked up to your RPi
