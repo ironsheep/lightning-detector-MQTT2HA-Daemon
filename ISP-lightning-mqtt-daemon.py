@@ -483,9 +483,9 @@ UNITS_KEY = 'units'
 PERIOD__IN_MINUTES_KEY = 'period_minutes'
 TIMESTAMP_KEY = 'timestamp'
 LAST_DETECT_KEY = 'last'
-OUT_OF_RANGE_KEY = 'outofrange'
+OUT_OF_RANGE_KEY = 'out_of_range'
 RING_COUNT_KEY = 'ring_count'
-RING_WIDTH_KEY = 'ring_width'
+RING_WIDTH_KEY = 'ring_width_km'
 
 
 # master list names
