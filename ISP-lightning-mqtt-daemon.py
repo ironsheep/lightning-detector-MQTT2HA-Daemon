@@ -622,7 +622,7 @@ def getDictionaryForAccumulatorNamed(dictionaryName):
     pastRingsData[UNITS_KEY] = distance_as
     pastRingsData[OUT_OF_RANGE_KEY] = accumulatorOutOfRangeCount
     pastRingsData[RING_COUNT_KEY] = number_of_rings    
-    pastRingsData[RING_WIDTH_KEY] = (40 - 5) / number_of_rings
+    pastRingsData[RING_WIDTH_KEY] = round((40 - 5) / number_of_rings, 1)
 
     if distance_as == val_distance_as_km:
         distance_multiplier = 1.0
