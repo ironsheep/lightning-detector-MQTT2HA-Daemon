@@ -187,9 +187,14 @@ print_line('Configuration accepted', console=False, sd_notify=True)
 
 ALIVE_TIMOUT_IN_SECONDS = 60
 
+def publishAliveStatus():
+    print_line('- SEND: yes, still alive -')
+    mqtt_client.publish(lwt_topic, payload=lwt_online_val, retain=False)
+
 def aliveTimeoutHandler():
     print_line('- MQTT TIMER INTERRUPT -')
-    mqtt_client.publish(lwt_topic, payload=lwt_online_val, retain=False)
+    _thread.start_new_thread(publishAliveStatus, ())
+    startAliveTimer()
 
 def startAliveTimer():
     global aliveTimer
@@ -198,14 +203,14 @@ def startAliveTimer():
     aliveTimer = threading.Timer(ALIVE_TIMOUT_IN_SECONDS, aliveTimeoutHandler) 
     aliveTimer.start()
     aliveTimerRunningStatus = True
-    print_line('- started ALIVE timer - every {} seconds'.format(ALIVE_TIMOUT_IN_SECONDS))
+    print_line('- started MQTT timer - every {} seconds'.format(ALIVE_TIMOUT_IN_SECONDS))
 
 def stopAliveTimer():
     global aliveTimer
     global aliveTimerRunningStatus
     aliveTimer.cancel()
     aliveTimerRunningStatus = False
-    print_line('- stopped ALIVE timer')
+    print_line('- stopped MQTT timer')
 
 def isAliveTimerRunning():
     global aliveTimerRunningStatus
@@ -372,8 +377,9 @@ for [sensor, params] in detectorValues.items():
 TIMER_INTERRUPT = (-1)
 
 def periodTimeoutHandler():
-    print_line('- TIMER INTERRUPT -')
+    print_line('- PERIOD TIMER INTERRUPT -')
     handle_interrupt(TIMER_INTERRUPT) # '0' means we have a timer interrupt!!!
+    startPeriodTimer()
 
 def startPeriodTimer():
     global endPeriodTimer
@@ -620,11 +626,11 @@ def getDictionaryForAccumulatorNamed(dictionaryName):
 
     if distance_as == val_distance_as_km:
         distance_multiplier = 1.0
-        minus_one_value = 1.0
+        minus_one_value = 1.0 / 10.0
     else:
         distance_multiplier = 0.621371
         # miles are shown in tenths
-        minus_one_value = distance_multiplier / 10
+        minus_one_value = distance_multiplier / 10.0
 
     for ringIndex in range(number_of_rings + 1):
         binForThisRing = accumulatorBins[ringIndex]
@@ -634,7 +640,7 @@ def getDictionaryForAccumulatorNamed(dictionaryName):
         else:
             singleRingData[STRIKE_COUNT_KEY] = 0
         # dstance in km
-        singleRingData[DISTANCE_KEY] = accumulatorBinDistances[ringIndex] 
+        singleRingData[DISTANCE_KEY] = round(accumulatorBinDistances[ringIndex], 1)
         # distance in desired units
         fromValue = accumulatorBinDistances[ringIndex] * distance_multiplier
         if ringIndex < number_of_rings:
@@ -655,23 +661,24 @@ def getDictionaryForAccumulatorNamed(dictionaryName):
     topRingsData[dictionaryName] = pastRingsData
     return topRingsData
 
+def publishRingData(ringsData, topic):
+    print_line('Publishing to MQTT topic "{}, Data:{}"'.format(topic, json.dumps(ringsData)))
+    mqtt_client.publish('{}'.format(topic), json.dumps(ringsData), 1, retain=False)
+    sleep(0.5) # some slack for the publish roundtrip and callback function  
+
 def put_accumulated_aside_and_report_it(topic):
     # build a past dictionary and send it
-    topRingsData = getDictionaryForAccumulatorNamed(PAST_RINGS_KEY)
-
-    print_line('Publishing to MQTT topic "{}, Data:{}"'.format(topic, json.dumps(topRingsData)))
-    mqtt_client.publish('{}'.format(topic), json.dumps(topRingsData), 1, retain=False)
-    sleep(0.5) # some slack for the publish roundtrip and callback function
+    pastRingsData = getDictionaryForAccumulatorNamed(PAST_RINGS_KEY)
     # reset the current
     init_empty_accumulator()
+    # send the data
+    _thread.start_new_thread(publishRingData, (pastRingsData, topic))
 
 def report_current_accumulator(topic):
     # build a current dictionary and send it
-    topRingsData = getDictionaryForAccumulatorNamed(CURR_RINGS_KEY)
-
-    print_line('Publishing to MQTT topic "{}, Data:{}"'.format(topic, json.dumps(topRingsData)))
-    mqtt_client.publish('{}'.format(topic), json.dumps(topRingsData), 1, retain=False)
-    sleep(0.5) # some slack for the publish roundtrip and callback function
+    currRingsData = getDictionaryForAccumulatorNamed(CURR_RINGS_KEY)
+    # send the data
+    _thread.start_new_thread(publishRingData, (currRingsData, topic))
 
 # -----------------------------------------------------------------------------
 
