@@ -617,7 +617,8 @@ def getDictionaryForAccumulatorNamed(dictionaryName):
 
     current_timestamp = datetime.now()
     pastRingsData[TIMESTAMP_KEY] = current_timestamp.astimezone().replace(microsecond=0).isoformat()
-    pastRingsData[LAST_DETECT_KEY] = accumulatorLastStrike.astimezone().replace(microsecond=0).isoformat()
+    if accumulatorLastStrike != '':
+        pastRingsData[LAST_DETECT_KEY] = accumulatorLastStrike.astimezone().replace(microsecond=0).isoformat() 
     pastRingsData[PERIOD__IN_MINUTES_KEY] = period_in_minutes
     pastRingsData[UNITS_KEY] = distance_as
     pastRingsData[OUT_OF_RANGE_KEY] = accumulatorOutOfRangeCount
@@ -689,6 +690,7 @@ def handle_interrupt(channel):
     global last_alert
     global strikes_since_last_alert
     global detector
+    sourceID = "<< INTR(" + str(channel) + ")"
     current_timestamp = datetime.now()
     if channel != TIMER_INTERRUPT:
         # ----------------------------------
@@ -696,25 +698,25 @@ def handle_interrupt(channel):
         sleep(0.003)
         reason = detector.get_interrupt()
         if reason == 0x01:
-            print_line("<< INTR(" +str(channel) + ") >> Noise level too high - adjusting")
+            print_line(sourceID + " >> Noise level too high - adjusting")
             detector.raise_noise_floor()
         elif reason == 0x04:
-            print_line("<< INTR(" +str(channel) + ") >> Disturber detected. Masking subsequent disturbers")
+            print_line(sourceID + " >> Disturber detected. Masking subsequent disturbers")
             detector.set_mask_disturber(True)
         elif reason == 0x08:
             #  we have a detection, let's start our period timer if it's not running already....
             if isPeriodTimerRunning() == False:
                 startPeriodTimer()  # start our period
                 first_alert = current_timestamp # remember when storm first started
-            print_line("<< INTR(" +str(channel) + ") >> We sensed lightning! (%s)" % current_timestamp.strftime('%H:%M:%S - %Y/%m/%d'))
+            print_line(sourceID + " >> We sensed lightning! (%s)" % current_timestamp.strftime('%H:%M:%S - %Y/%m/%d'))
             if (current_timestamp - last_alert).seconds < 3:
-                print_line("-- Last strike is too recent, incrementing counter since last alert.")
+                print_line(" -- Last strike is too recent, incrementing counter since last alert.")
                 strikes_since_last_alert += 1
                 return
             distance = detector.get_distance()
             energy = detector.get_energy()
             strikes_since_last_alert += 1
-            print_line("-- Energy: " + str(energy) + " - distance: " + str(distance) + "km")
+            print_line(" -- Energy: " + str(energy) + " - distance: " + str(distance) + "km")
 
             # if we are past the end of this period then snap it and start accumulating all over
             if (current_timestamp - last_alert).seconds > period_in_minutes * 60 and last_alert != datetime.min:
@@ -734,7 +736,7 @@ def handle_interrupt(channel):
         # ----------------------------------
         # have period-end-timer interrupt!
         #   assume we are at the end of this period, snap it and start accumulating all over
-        print_line("<< INTR(" +str(channel) + ") >> Period ended, waiting for next detection")
+        print_line(sourceID + " >> Period ended, waiting for next detection")
         put_accumulated_aside_and_report_it(prings_topic)
         # we snapped counters so reset count
         strikes_since_last_alert = 0
@@ -743,7 +745,7 @@ def handle_interrupt(channel):
     if (current_timestamp - last_alert).seconds > end_storm_after_minutes * 60 and last_alert != datetime.min:
         #_thread.start_new_thread(send_tweet, (
         #        "\o/ Thunderstorm over. No new flash detected for last 1/2h.",))
-        print_line("<< INTR(" +str(channel) + ") >> Storm ended, waiting for next detection")
+        print_line(sourceID + " >> Storm ended, waiting for next detection")
         report_current_accumulator(prings_topic)
         stopPeriodTimer()   #  kill our timer until our next detection
         #  reset our indicators
