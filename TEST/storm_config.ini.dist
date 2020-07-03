@@ -1,0 +1,33 @@
+# Configuration file for testGenStorm.py
+# Source: https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon
+#
+# Uncomment and adapt all settings as needed.
+# Some settings can be configured by environment variables.
+# If an env variable is set, it takes precedence over settings in this file
+
+[Storm]
+
+# define the path of the storm it passes [nearby | overhead]  default: overhead
+# storm_path: overhead   -NO-
+# storm_duration: hh:mm   -NO-
+# storm speed: kmph   -NO-
+
+# storm_closest_from: %-of-storm-duration
+# storm_closest_to: %-of-storm-duration
+
+# storm_min_distance: km        [overhead = 0, non-zero = nearby]
+# storm_max_distance: km    [def: out-of-range]
+
+# storm_early_duration: hh:mm
+# storm_middle_duration: hh:mm
+# storm_late_duration: hh:mm
+
+# storm_early_strikes: # [0-n]
+# storm_middle_strikes: # [0-n]
+# storm_late_strikes: # [0-n]
+
+# storm_early_energy: range [0-300000]
+# storm_middle_energy: range [0-300000]
+# storm_late_energy: range [0-300000]
+
+
