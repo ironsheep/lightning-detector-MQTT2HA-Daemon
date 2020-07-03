@@ -13,6 +13,7 @@ from collections import OrderedDict
 from configparser import ConfigParser
 from colorama import init as colorama_init
 from colorama import Fore, Back, Style
+import random
 from signal import signal, SIGPIPE, SIG_DFL
 signal(SIGPIPE,SIG_DFL)
 
@@ -22,69 +23,112 @@ signal(SIGPIPE,SIG_DFL)
 #  where each detection is
 #     hh:mm distance energy
 
-
 script_version = "1.0.0"
-project_name = 'lightning-detector-MQTT2HA-Daemon'
+script_name = 'testGenStorm.py'
+
+script_info = '{} v{}'.format(script_name, script_version)
+project_info= '{}: Lightning Detections Generator'.format(script_info)
 project_url = 'https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon'
 
 if False:
     # will be caught by python 2.7 to be illegal syntax
     print('Sorry, this script requires a python3 runtime environment.', file=sys.stderr)
 
+opt_debug = False
+opt_verbose = False
+opt_write_file = False
+out_file = sys.stdout
+output_line_count = 0
 
 # Logging function
-def print_line(text, error=False, warning=False, console=True):
+def print_line(text, error=False, warning=False, info=False, debug=False, write=False, console=True):
     timestamp = strftime('%Y-%m-%d %H:%M:%S', localtime())
     if console:
         if error:
             print(Fore.RED + Style.BRIGHT + '[{}] '.format(timestamp) + Style.RESET_ALL + '{}'.format(text) + Style.RESET_ALL, file=sys.stderr)
         elif warning:
             print(Fore.YELLOW + '[{}] '.format(timestamp) + Style.RESET_ALL + '{}'.format(text) + Style.RESET_ALL)
+        elif info:
+            if opt_verbose:
+                print(Fore.GREEN + '[{}] '.format(timestamp) + Fore.YELLOW  + '- ' + '{}'.format(text) + Style.RESET_ALL)
+        elif debug:
+            if opt_debug:
+                print(Fore.CYAN + '[{}] '.format(timestamp) + '- (DBG): ' + '{}'.format(text) + Style.RESET_ALL)
         else:
             print(Fore.GREEN + '[{}] '.format(timestamp) + Style.RESET_ALL + '{}'.format(text) + Style.RESET_ALL)
-
+    else:
+        if write:
+            print('{}'.format(text), file=out_file)
+            #output_line_count += 1
 # Argparse
 default_output_filename = 'storm.dat'
-parser = argparse.ArgumentParser(description=project_name, epilog='For further details see: ' + project_url)
-parser.add_argument('--config_dir', help='set directory where storm_config.ini is located', default=sys.path[0])
-parser.add_argument('--output_file', help='identify name of file to be written', default=default_output_filename)
+default_config_filename = 'storm_config.ini'
+parser = argparse.ArgumentParser(description=project_info, epilog='For further details see: ' + project_url)
+parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
+parser.add_argument("-d", "--debug", help="show debug output", action="store_true")
+parser.add_argument("-w", "--write_output", help="write output to file", action="store_true")
+parser.add_argument('--config_dir', help='directory where storm_config.ini is located', default=sys.path[0])
+parser.add_argument("-i", '--config_file', help='name of config file to use instead of storm_config.ini', default=default_config_filename)
+parser.add_argument("-o", '--output_file', help='name of file to be written', default=default_output_filename)
 parse_args = parser.parse_args()
 
-# Load configuration file
-config_dir = parse_args.config_dir
 
+config_dir = parse_args.config_dir
+config_filename = parse_args.config_file
+output_filename = parse_args.output_file
+opt_debug = parse_args.debug
+opt_verbose = parse_args.verbose
+opt_write_file = parse_args.write_output
+
+print_line(script_info, info=True)
+print_line('Generating detections according to {} placing output in {}'.format(config_filename, output_filename), info=True)
+if opt_verbose:
+    print_line('Verbose enabled', info=True)
+if opt_debug:
+    print_line('Debug enabled', debug=True)
+
+
+if opt_write_file and len(output_filename) > 0:
+    out_file = open(output_filename, "wt")
+
+# Load configuration file
 config = ConfigParser(delimiters=('=', ), inline_comment_prefixes=('#'))
 config.optionxform = str
 try:
-    with open(os.path.join(config_dir, 'storm_config.ini')) as config_file:
+    with open(os.path.join(config_dir, config_filename)) as config_file:
         config.read_file(config_file)
 except IOError:
-    print_line('No configuration file "storm_config.ini"', error=True)
+    print_line('- No configuration file "{config_filename}"'.format(), error=True)
     sys.exit(1)
 
 # Script storm settings
+
+
 
 default_none = 0   # no default
 
 min_percent = 1
 max_percent = 100
+#  percentage  1-100 - closet the storm will be (% of total time of storm)
 storm_closest_from = config['Storm'].get('storm_closest_from', default_none)
 storm_closest_to = config['Storm'].get('storm_closest_to', default_none)
 
+# where will the stom be relative to overhead(0km) our location
 default_min_distance = 0
-storm_min_distance = config['Storm'].getint('storm_min_distance', default_min_distance)
-
 default_max_distance = 63
+storm_min_distance = config['Storm'].getint('storm_min_distance', default_min_distance)
 storm_max_distance = config['Storm'].getint('storm_max_distance', default_max_distance)
 
+# duration specs: minutes for this band in 'mm' -OR- 'hh:mm'
 storm_early_duration = config['Storm'].get('storm_early_duration', default_none)
 storm_middle_duration = config['Storm'].get('storm_middle_duration', default_none)
 storm_late_duration = config['Storm'].get('storm_late_duration', default_none)
 
-storm_early_strikes = int(config['Storm'].get('storm_early_strikes', default_none))
-storm_middle_strikes = int(config['Storm'].get('storm_middle_strikes', default_none))
-storm_late_strikes = int(config['Storm'].get('storm_late_strikes', default_none))
+storm_early_strikes = config['Storm'].getint('storm_early_strikes', default_none)
+storm_middle_strikes = config['Storm'].getint('storm_middle_strikes', default_none)
+storm_late_strikes = config['Storm'].getint('storm_late_strikes', default_none)
 
+# range specs  '{min_km}-{max_km}'
 storm_early_energy = config['Storm'].get('storm_early_energy', default_none)
 storm_middle_energy = config['Storm'].get('storm_middle_energy', default_none)
 storm_late_energy = config['Storm'].get('storm_late_energy', default_none)
@@ -174,7 +218,7 @@ if have_enough_params == False:
     sys.exit(1)
 
 
-print_line('Configuration accepted')
+print_line('Configuration accepted', info=True)
 
 total_minutes = storm_early_duration_minutes + storm_middle_duration_minutes + storm_late_duration_minutes
 
@@ -203,14 +247,20 @@ def timeHMSfromSeconds(timeSeconds):
     seconds_remaining -= (desiredMinutes * 60)
     return ( desiredhours, desiredMinutes, round(seconds_remaining))
 
-close_start_hms = timeHMSfromSeconds((minutes_before_closest * 60) + 1)
-close_end_hms = timeHMSfromSeconds(((minutes_before_closest + minutes_while_closest) * 60) - 1)
+def stringTimeSecondsInHMS(curr_time_in_seconds):
+    time_hms = timeHMSfromSeconds(curr_time_in_seconds)
+    desired_interp = '{:02d}:{:02d}:{:02d}'.format(time_hms[0], time_hms[1], time_hms[2])
+    return desired_interp
+
+
+close_start_hms = stringTimeSecondsInHMS((minutes_before_closest * 60) + 1)
+close_end_hms = stringTimeSecondsInHMS(((minutes_before_closest + minutes_while_closest) * 60) - 1)
 
 close_minutes = round(minutes_before_closest + minutes_while_closest)
 close_end_hours = int(close_minutes / 60)
 close_end_rem_minutes = close_minutes - (close_end_hours * 60)
 
-print_line('- close {}:{}:{} - {}:{}:{}'.format(close_start_hms[0], close_start_hms[1], close_start_hms[2], close_end_hms[0], close_end_hms[1], close_end_hms[2]))
+print_line('- close {} - {}'.format(close_start_hms, close_end_hms))
 
 early_hours = int(storm_early_duration_minutes / 60)
 early_rem_minutes = int(storm_early_duration_minutes - (early_hours * 60))
@@ -218,14 +268,14 @@ early_rem_seconds = storm_early_duration_minutes - ((early_hours * 3600) + (earl
 
 
 
-early_start_hms = timeHMSfromSeconds(0)
-early_end_hms = timeHMSfromSeconds(0 + (60 * (storm_early_duration_minutes - 1/60)))
+early_start_hms = stringTimeSecondsInHMS(0)
+early_end_hms = stringTimeSecondsInHMS(0 + (60 * (storm_early_duration_minutes - 1/60)))
 
-middle_start_hms = timeHMSfromSeconds(middle_start_seconds)
-middle_end_hms = timeHMSfromSeconds(middle_start_seconds + (60 * (storm_middle_duration_minutes - 1/60)))
+middle_start_hms = stringTimeSecondsInHMS(middle_start_seconds)
+middle_end_hms = stringTimeSecondsInHMS(middle_start_seconds + (60 * (storm_middle_duration_minutes - 1/60)))
 
-late_start_hms = timeHMSfromSeconds(late_start_seconds)
-late_end_hms = timeHMSfromSeconds(late_start_seconds + (60 * (storm_late_duration_minutes - 1/60)))
+late_start_hms = stringTimeSecondsInHMS(late_start_seconds)
+late_end_hms = stringTimeSecondsInHMS(late_start_seconds + (60 * (storm_late_duration_minutes - 1/60)))
 
 
 early_middle_minutes = storm_early_duration_minutes + storm_middle_duration_minutes
@@ -237,42 +287,42 @@ minutes_so_far = total_minutes
 late_hours = int(minutes_so_far / 60)
 late_rem_minutes = minutes_so_far - (late_hours * 60)
 
-print_line('- early {}:{}:{} - {}:{}:{}'.format(early_start_hms[0], early_start_hms[1], early_start_hms[2], early_end_hms[0], early_end_hms[1], early_end_hms[2]))
-print_line('- mid   {}:{}:{} - {}:{}:{}'.format(middle_start_hms[0], middle_start_hms[1], middle_start_hms[2], middle_end_hms[0], middle_end_hms[1], middle_end_hms[2]))
-print_line('- late  {}:{}:{} - {}:{}:{}'.format(late_start_hms[0], late_start_hms[1], late_start_hms[2], late_end_hms[0], late_end_hms[1], late_end_hms[2]))
+print_line('- early {} - {}'.format(early_start_hms, early_end_hms))
+print_line('- mid   {} - {}'.format(middle_start_hms, middle_end_hms))
+print_line('- late  {} - {}'.format(late_start_hms, late_end_hms))
 
 close_early = False
 close_middle = False
 close_late = False
 if minutes_before_closest > storm_early_duration_minutes:
     if minutes_before_closest > early_middle_minutes:
-        print_line('Close during late!')
+        print_line('Close during late!', debug=True)
         close_late = True
     else:
-        print_line('Close during middle!')
+        print_line('Close during middle!', debug=True)
         close_middle = True
 else:
-    print_line('Close during early!')
+    print_line('Close during early!', debug=True)
     close_early = True
 
 if close_minutes < storm_early_duration_minutes:
-    print_line('Leave Close during early!')
+    print_line('Leave Close during early!', debug=True)
 else:
     if close_minutes > early_middle_minutes:
-        print_line('Leave Close during late!')
+        print_line('Leave Close during late!', debug=True)
         if close_early:
             close_middle = True
         close_late = True
     else:
-        print_line('Leave Close during middle!')
+        print_line('Leave Close during middle!', debug=True)
         close_middle = True
 
 if close_early:
-    print_line('+ Close EARLY')
+    print_line('Close EARLY', info=True)
 if close_middle:
-    print_line('+ Close MIDDLE')
+    print_line('Close MIDDLE', info=True)
 if close_late:
-    print_line('+ Close LATE')
+    print_line('Close LATE', info=True)
 # distance calcs
 #  - storm moves from farthest to closest from 00:00 to 'minutes_before_closest'
 #  - stays close until 'close_minutes'
@@ -387,6 +437,7 @@ generatorSets = []
 # -----------------------------------------------------
 #   EARLY
 minutes_close_so_far = 0
+curr_distance = storm_max_distance
 if normal_early == True:
     generatorSets.append( ( 'earlyOnly', entry_rate, storm_early_strikes, storm_early_energy_range, storm_early_duration_minutes ) )
 
@@ -464,7 +515,7 @@ elif split_middle == True:
 # -----------------------------------------------------
 #   LATE
 if normal_late == True:
-        generatorSets.append( ( 'onlyLate', exit_rate, storm_late_strikes, storm_late_energy_range, round(storm_late_duration_minutes,3) ) )
+        generatorSets.append( ( 'lateOnly', exit_rate, storm_late_strikes, storm_late_energy_range, round(storm_late_duration_minutes,3) ) )
 
 elif split_late == True:
     #  hmm need to spread strikes across all parts
@@ -499,7 +550,64 @@ elif split_late == True:
 
 set_time_in_seconds = 0
 for currSet in generatorSets:
-    start_time_hms = timeHMSfromSeconds(set_time_in_seconds)
+    start_time_hms = stringTimeSecondsInHMS(set_time_in_seconds)
     set_time_in_seconds += (currSet[4] * 60)
-    end_time_hms = timeHMSfromSeconds(set_time_in_seconds - 1)
-    print_line('generator set={} --- {}:{}:{} - {}:{}:{}'.format(currSet,start_time_hms[0], start_time_hms[1], start_time_hms[2], end_time_hms[0], end_time_hms[1], end_time_hms[2]))
+    end_time_hms = stringTimeSecondsInHMS(set_time_in_seconds - 1)
+    tupleString = '{}'.format(currSet)
+    print_line('generator set --- {:>45} --- {} - {}'.format(tupleString, start_time_hms, end_time_hms), debug=True)
+
+
+# -----------------------------------------------------
+#   Let's generate us some lightning!
+#
+curr_distance = storm_max_distance
+curr_time_in_seconds = 0
+
+def byTime(e):
+    return e[0]
+
+
+if opt_write_file:
+    print_line('Writing file: {}'.format(output_filename), info=True)
+    output_line_count = 0
+
+print_line('{}'.format('# record-nbr, time-seconds, dist_km, energy'), console=False, write=True)
+line_number = 1
+for currSet in generatorSets:
+    curr_time_hmsstr = stringTimeSecondsInHMS(curr_time_in_seconds)
+    print_line('start {} from {} km'.format(curr_time_hmsstr, curr_distance))
+    print_line('# start {} from {} km'.format(curr_time_hmsstr, curr_distance), console=False, write=True)
+    # generate lightning for set...
+    #   ( name, travel-rate, count, energy(min-max), duration_in_minutes )
+    print_line('- set {}'.format(currSet[0]), debug=True)
+    print_line(' -- rate={}'.format(currSet[1]), debug=True)
+    print_line(' -- ct={}'.format(currSet[2]), debug=True)
+    print_line(' -- energy={}'.format(currSet[3]), debug=True)
+    print_line(' -- minutes={}'.format(currSet[4]), debug=True)
+
+    #     hh:mm distance energy
+    detections = []
+    scale = 100 # handle 9.99 format float
+    for i in range(currSet[2]):
+        when = random.randrange(0, currSet[4] * scale)
+        if when > 0:
+            when /= scale
+        time_in_seconds = round(((when * 60) + curr_time_in_seconds),1)
+        energy_range = currSet[3]
+        #print_line(' -- energy_range={}'.format(energy_range), debug=True)
+        energy = random.randrange(energy_range[0], energy_range[1])
+        distance_km = round((when * currSet[1]) + curr_distance)
+        detections.append( (time_in_seconds, distance_km, energy) )
+
+    
+    for detection in sorted(detections, key=byTime):
+        curr_time_hmsstr = stringTimeSecondsInHMS(detection[0])
+        print_line('  -- detection={} {}'.format(curr_time_hmsstr, detection), debug=True)
+        print_line('{}, {}, {}, {}'.format(line_number, detection[0], detection[1], detection[2]), console=False, write=True)
+        line_number += 1
+ 
+    curr_time_in_seconds += currSet[4] * 60
+    curr_distance = round((currSet[4] * currSet[1]) + curr_distance,1)
+
+if opt_write_file:
+    print_line('Write {} lines to file: {}'.format(output_line_count, output_filename), info=True)

@@ -1,0 +1,4 @@
+#!/bin/bash
+
+(set -x; ./testGenStorm.py --config_file storm_config.ini -w --output_file storm_config.csv)
+(set -x; ./testGenStorm.py --config_file storm_nearby_config.ini -w --output_file storm_nearby_config.csv)
