@@ -268,11 +268,11 @@ else:
         close_middle = True
 
 if close_early:
-    print_line(' - Close EARLY')
+    print_line('+ Close EARLY')
 if close_middle:
-    print_line(' - Close MIDDLE')
+    print_line('+ Close MIDDLE')
 if close_late:
-    print_line(' - Close LATE')
+    print_line('+ Close LATE')
 # distance calcs
 #  - storm moves from farthest to closest from 00:00 to 'minutes_before_closest'
 #  - stays close until 'close_minutes'
