@@ -95,7 +95,7 @@ if opt_verbose:
 if opt_debug:
     print_line('Debug enabled', debug=True)
 if opt_testing:
-    print_line('Mode TESTING... w/scale={}:1'.format(opt_scale))
+    print_line('Mode TESTING... @ {}x speed'.format(opt_scale))
 
 
 # Eclipse Paho callbacks - http://www.eclipse.org/paho/clients/python/docs/#callbacks
