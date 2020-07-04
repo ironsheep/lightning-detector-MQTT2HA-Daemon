@@ -28,6 +28,8 @@ from signal import signal, SIGPIPE, SIG_DFL
 signal(SIGPIPE,SIG_DFL)
 
 script_version = "1.3.0"
+script_name = 'ISP-lightning-mqtt-daemon.py'
+script_info = '{} v{}'.format(script_name, script_version)
 project_name = 'lightning-detector-MQTT2HA-Daemon'
 project_url = 'https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon'
 
@@ -35,27 +37,30 @@ if False:
     # will be caught by python 2.7 to be illegal syntax
     print_line('Sorry, this script requires a python3 runtime environment.', file=sys.stderr)
 
-
 # Argparse
-parser = argparse.ArgumentParser(description=project_name, epilog='For further details see: ' + project_url)
-parser.add_argument('--config_dir', help='set directory where config.ini is located', default=sys.path[0])
-parse_args = parser.parse_args()
-
+opt_debug = False
+opt_verbose = False
 
 # Systemd Service Notifications - https://github.com/bb4242/sdnotify
 sd_notifier = sdnotify.SystemdNotifier()
 
-
 # Logging function
-def print_line(text, error = False, warning=False, sd_notify=False, console=True):
+def print_line(text, error=False, warning=False, info=False, verbose=False, debug=False, console=True, sd_notify=False):
     timestamp = strftime('%Y-%m-%d %H:%M:%S', localtime())
     if console:
         if error:
             print(Fore.RED + Style.BRIGHT + '[{}] '.format(timestamp) + Style.RESET_ALL + '{}'.format(text) + Style.RESET_ALL, file=sys.stderr)
         elif warning:
             print(Fore.YELLOW + '[{}] '.format(timestamp) + Style.RESET_ALL + '{}'.format(text) + Style.RESET_ALL)
+        elif info or verbose:
+            if opt_verbose:
+                print(Fore.GREEN + '[{}] '.format(timestamp) + Fore.YELLOW  + '- ' + '{}'.format(text) + Style.RESET_ALL)
+        elif debug:
+            if opt_debug:
+                print(Fore.CYAN + '[{}] '.format(timestamp) + '- (DBG): ' + '{}'.format(text) + Style.RESET_ALL)
         else:
             print(Fore.GREEN + '[{}] '.format(timestamp) + Style.RESET_ALL + '{}'.format(text) + Style.RESET_ALL)
+
     timestamp_sd = strftime('%b %d %H:%M:%S', localtime())
     if sd_notify:
         sd_notifier.notify('STATUS={} - {}.'.format(timestamp_sd, unidecode(text)))
@@ -67,6 +72,31 @@ def clean_identifier(name):
         clean = clean.replace(this, that)
     clean = unidecode(clean)
     return clean
+
+# Argparse            
+parser = argparse.ArgumentParser(description=project_name, epilog='For further details see: ' + project_url)
+parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
+parser.add_argument("-d", "--debug", help="show debug output", action="store_true")
+parser.add_argument("-f", '--test_filename', help='load detections from test filename instead of using sensor', default='')
+parser.add_argument("-s", '--test_scale', help='load detections from test filename instead of using sensor', default='1')
+parser.add_argument("-c", '--config_dir', help='set directory where config.ini is located', default=sys.path[0])
+parse_args = parser.parse_args()
+
+config_dir = parse_args.config_dir
+test_filename = parse_args.test_filename
+opt_debug = parse_args.debug
+opt_verbose = parse_args.verbose
+opt_testing = len(test_filename) > 0
+opt_scale = int(parse_args.test_scale)
+
+print_line(script_info, info=True)
+if opt_verbose:
+    print_line('Verbose enabled', info=True)
+if opt_debug:
+    print_line('Debug enabled', debug=True)
+if opt_testing:
+    print_line('Mode TESTING... w/scale={}:1'.format(opt_scale))
+
 
 # Eclipse Paho callbacks - http://www.eclipse.org/paho/clients/python/docs/#callbacks
 def on_connect(client, userdata, flags, rc):
@@ -83,8 +113,6 @@ def on_publish(client, userdata, mid):
     pass
 
 # Load configuration file
-config_dir = parse_args.config_dir
-
 config = ConfigParser(delimiters=('=', ), inline_comment_prefixes=('#'))
 config.optionxform = str
 try:
@@ -188,11 +216,11 @@ print_line('Configuration accepted', console=False, sd_notify=True)
 ALIVE_TIMOUT_IN_SECONDS = 60
 
 def publishAliveStatus():
-    print_line('- SEND: yes, still alive -')
+    print_line('- SEND: yes, still alive -', debug=True)
     mqtt_client.publish(lwt_topic, payload=lwt_online_val, retain=False)
 
 def aliveTimeoutHandler():
-    print_line('- MQTT TIMER INTERRUPT -')
+    print_line('- MQTT TIMER INTERRUPT -', debug=True)
     _thread.start_new_thread(publishAliveStatus, ())
     startAliveTimer()
 
@@ -203,14 +231,14 @@ def startAliveTimer():
     aliveTimer = threading.Timer(ALIVE_TIMOUT_IN_SECONDS, aliveTimeoutHandler) 
     aliveTimer.start()
     aliveTimerRunningStatus = True
-    print_line('- started MQTT timer - every {} seconds'.format(ALIVE_TIMOUT_IN_SECONDS))
+    print_line('- started MQTT timer - every {} seconds'.format(ALIVE_TIMOUT_IN_SECONDS), debug=True)
 
 def stopAliveTimer():
     global aliveTimer
     global aliveTimerRunningStatus
     aliveTimer.cancel()
     aliveTimerRunningStatus = False
-    print_line('- stopped MQTT timer')
+    print_line('- stopped MQTT timer', debug=True)
 
 def isAliveTimerRunning():
     global aliveTimerRunningStatus
@@ -231,7 +259,7 @@ lwt_topic = '{}/sensor/{}/status'.format(base_topic, sensor_name.lower())
 lwt_online_val = 'Online'
 lwt_offline_val = 'Offline'
 
-print_line('Connecting to MQTT broker ...')
+print_line('Connecting to MQTT broker ...', verbose=True)
 mqtt_client = mqtt.Client()
 mqtt_client.on_connect = on_connect
 mqtt_client.on_publish = on_publish
@@ -375,9 +403,10 @@ for [sensor, params] in detectorValues.items():
 # -----------------------------------------------------------------------------
 
 TIMER_INTERRUPT = (-1)
+TEST_INTERRUPT = (-2)
 
 def periodTimeoutHandler():
-    print_line('- PERIOD TIMER INTERRUPT -')
+    print_line('- PERIOD TIMER INTERRUPT -', debug=True)
     handle_interrupt(TIMER_INTERRUPT) # '0' means we have a timer interrupt!!!
     startPeriodTimer()
 
@@ -388,14 +417,14 @@ def startPeriodTimer():
     endPeriodTimer = threading.Timer(period_in_minutes * 60.0, periodTimeoutHandler) 
     endPeriodTimer.start()
     periodTimeRunningStatus = True
-    print_line('- started PERIOD timer - every {} seconds'.format(period_in_minutes * 60.0))
+    print_line('- started PERIOD timer - every {} seconds'.format(period_in_minutes * 60.0), debug=True)
 
 def stopPeriodTimer():
     global endPeriodTimer
     global periodTimeRunningStatus
     endPeriodTimer.cancel()
     periodTimeRunningStatus = False
-    print_line('- stopped PERIOD timer')
+    print_line('- stopped PERIOD timer', debug=True)
 
 def isPeriodTimerRunning():
     global periodTimeRunningStatus
@@ -421,7 +450,7 @@ GPIO.setmode(GPIO.BCM)
 # Rev. 1 Raspberry Pis should leave bus set at 0, while rev. 2 Pis should set
 # bus equal to 1. The address should be changed to match the address of the
 # detector IC.
-print_line('I2C configuration addr={} - bus={}'.format(i2c_address, i2c_bus))
+print_line('I2C configuration addr={} - bus={}'.format(i2c_address, i2c_bus), verbose=True)
 
 detector = RPi_AS3935.RPi_AS3935(i2c_address, i2c_bus)
 # Indoors = more sensitive (can miss very strong lightnings)
@@ -539,7 +568,7 @@ def calculate_ring_widths():
     accumulatorBinDistances = list( 0 for i in list(range(number_of_rings + 1)) )  # n rings + 1 for "overhead" (out of range(63) is just counted)
     # FIXME: UNDONE now let's calculate the value for each bin
     #  ring 1 starts at 5km so subtract that initially but add it back in for each except overhead
-    binWidth = (40 - 5) / number_of_rings;
+    binWidth = (40 - 5) / number_of_rings
     for ringIndex in range(number_of_rings + 1):
         if ringIndex == 0:
             accumulatorBinDistances[ringIndex] = 0
@@ -568,7 +597,7 @@ def binIndexFromDistance(distance):
         if desiredBinIndex > 0 and desiredBinIndex < 15:
             desiredBinIndex = binIndexesForThisRun[desiredBinIndex - 1]
     except ValueError:
-        raise TypeError("[CODE] WHAT?? Unexpected Value from detector [{}]!!  Aborting!".format(distance))
+        raise TypeError("[CODE] WHAT?? Unexpected Value from detector[{}]!!  Aborting!".format(distance))
     return desiredBinIndex
 
 
@@ -683,6 +712,8 @@ def report_current_accumulator(topic):
 
 # -----------------------------------------------------------------------------
 
+synth_energy = 0
+synth_distance = 63
 
 # Interrupt handler
 def handle_interrupt(channel):
@@ -696,7 +727,13 @@ def handle_interrupt(channel):
         # ----------------------------------
         # have HARDWARE interrupt!
         sleep(0.003)
-        reason = detector.get_interrupt()
+        # if we NOT testing use real hardware
+        #  if we ARE testing then we just have detections!
+        if opt_testing == False:
+            reason = detector.get_interrupt()
+        else:
+            reason = 0x08
+        
         if reason == 0x01:
             print_line(sourceID + " >> Noise level too high - adjusting")
             detector.raise_noise_floor()
@@ -713,8 +750,13 @@ def handle_interrupt(channel):
                 print_line(" -- Last strike is too recent, incrementing counter since last alert.")
                 strikes_since_last_alert += 1
                 return
-            distance = detector.get_distance()
-            energy = detector.get_energy()
+            if opt_testing == False:
+                distance = detector.get_distance()
+                energy = detector.get_energy()
+            else:
+                distance = synth_distance
+                energy = synth_energy
+
             strikes_since_last_alert += 1
             print_line(" -- Energy: " + str(energy) + " - distance: " + str(distance) + "km")
 
@@ -756,10 +798,11 @@ def handle_interrupt(channel):
 init_empty_accumulator()
 calculate_ring_widths()
 
-# Use a software Pull-Down on interrupt pin
-pin = int(intr_pin)
-GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-detector.set_mask_disturber(False)
+if opt_testing == False:
+    # Use a software Pull-Down on interrupt pin
+    pin = int(intr_pin)
+    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+    detector.set_mask_disturber(False)
 
 # post setup data, once per run
 settingsData = OrderedDict()
@@ -769,19 +812,49 @@ disp_lco = detector.get_disp_lco()
 noise_floor = detector.get_noise_floor()
 _thread.start_new_thread(send_settings, (min_strikes, indoors, disp_lco, noise_floor))
 
-# now configure for run in main loop
-GPIO.add_event_detect(pin, GPIO.RISING, callback=handle_interrupt)
-print_line("Waiting for lightning - or at least something that looks like it")
+if opt_testing == False:
+    # now configure for run in main loop
+    GPIO.add_event_detect(pin, GPIO.RISING, callback=handle_interrupt)
 
-# NOTE: we don't start our timer here... we wait until first detection!
+print_line("Waiting for lightning - or at least something that looks like it", verbose=True)
 
-try:
-    while True:
-        # Read/clear the detector data every 10s in case we missed an interrupt (interrupts happening too fast ?)
-        sleep(sleep_period)
-        handle_interrupt(pin)
-finally:
-    # cleanup used pins... just because we like cleaning up after us
+if opt_testing == False:
+    # NOTE: we don't start our timer here... we wait until first detection!
+
+    try:
+        while True:
+            # Read/clear the detector data every 10s in case we missed an interrupt (interrupts happening too fast ?)
+            sleep(sleep_period)
+            handle_interrupt(pin)
+    finally:
+        # cleanup used pins... just because we like cleaning up after us
+        stopPeriodTimer()   # don't leave this running!
+        stopAliveTimer()
+        GPIO.cleanup()
+
+else:
+    # we ARE testing, meaning we are loading detection info from our test file!
+    # LINE IS: record-nbr, time-seconds, dist_km, energy
+    test_file = open(test_filename, "r")
+    lines = test_file.readlines()
+
+    curr_time_in_seconds = 0.0
+    for currLine in lines:
+        if currLine.startswith("#"):
+            continue
+        line_parts = currLine.split(',')
+        print_line('- line_parts: [{}]'.format(line_parts), debug=True)
+        dispatch_time_seconds = float(line_parts[1])
+        synth_distance = float(line_parts[2])
+        synth_energy = int(line_parts[3])
+        wait_time = dispatch_time_seconds - curr_time_in_seconds
+        print_line('- test entry: {}, {}, {}'.format(dispatch_time_seconds, synth_distance, synth_energy), debug=True)
+        if opt_scale != 1 and wait_time != 0:
+            wait_time /= opt_scale
+        print_line('- waiting for {} seconds'.format(wait_time), debug=True)
+        sleep(wait_time)
+        handle_interrupt(TEST_INTERRUPT)
+        curr_time_in_seconds = dispatch_time_seconds
+
     stopPeriodTimer()   # don't leave this running!
     stopAliveTimer()
-    GPIO.cleanup()

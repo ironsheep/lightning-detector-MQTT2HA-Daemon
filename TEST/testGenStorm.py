@@ -560,13 +560,42 @@ for currSet in generatorSets:
 # -----------------------------------------------------
 #   Let's generate us some lightning!
 #
+# number of distance values
+MAX_DISTANCE_VALUES = 14
+OUT_OF_RANGE = 43
+OUT_OF_RANGE_ACTUAL = 63
+
+# adjusted table replacing 63 w/41 to make more sensical outcome
+distanceValueToIndexList = list(( 1, 5, 6, 8, 10, 12, 14, 17, 20, 24, 27, 31, 34, 37, 40, OUT_OF_RANGE ))
+if len(distanceValueToIndexList) != 1 + MAX_DISTANCE_VALUES + 1:
+      raise TypeError("[CODE] the distanceValueToIndexList must have 16 entries!!  Aborting!")
+
 curr_distance = storm_max_distance
 curr_time_in_seconds = 0
 
 def byTime(e):
     return e[0]
 
-
+def detectorValueFromDistance(distance_km):
+    desired_value = 63
+    prior_Value = 1
+    #print_line('- distance_km={}'.format(distance_km), debug=True)
+    for distanceIndex in range(len(distanceValueToIndexList)):    # 0-15
+        curr_Value = distanceValueToIndexList[distanceIndex]
+        #print_line(' -- curr_Value={}'.format(curr_Value), debug=True)
+        if curr_Value > distance_km:
+            desired_value = prior_Value
+            #print_line(' -- desired_value={}'.format(desired_value), debug=True)
+            break
+        else:
+            prior_Value = curr_Value
+            #print_line(' -- prior_Value={}'.format(prior_Value), debug=True)
+            continue
+    if desired_value == OUT_OF_RANGE:
+        desired_value = OUT_OF_RANGE_ACTUAL
+        #print_line(' -- desired_value={}'.format(desired_value), debug=True)
+    return desired_value
+    
 if opt_write_file:
     print_line('Writing file: {}'.format(output_filename), info=True)
     output_line_count = 0
@@ -596,7 +625,9 @@ for currSet in generatorSets:
         energy_range = currSet[3]
         #print_line(' -- energy_range={}'.format(energy_range), debug=True)
         energy = random.randrange(energy_range[0], energy_range[1])
-        distance_km = round((when * currSet[1]) + curr_distance)
+        raw_distance_km = (when * currSet[1]) + curr_distance
+        distance_km = detectorValueFromDistance(raw_distance_km)
+        print_line('using {} for {}'.format(distance_km, raw_distance_km), debug=True)
         detections.append( (time_in_seconds, distance_km, energy) )
 
     
