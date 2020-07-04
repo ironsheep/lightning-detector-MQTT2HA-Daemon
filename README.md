@@ -61,6 +61,13 @@ This Lightning Detector as a sensor provides the following readings:
 
 ## Prerequisites
 
+### Detector Board
+You'll need an inexpensive lightning detector sensor (based on the AS3925 integrated circuit.)  I picked up my [AS3925 integrated circuit on a small circuit board from Sparkfun](https://www.sparkfun.com/products/15441), but a [similar board also avail. from Amazon](https://www.amazon.com/Gravity-Lightning-Intensity-Thunderstorm-Photography/dp/B07N2M3L51?ref_=ast_sto_dp) 
+
+**A NOTE of Caution!** Please watch your prices... you should be able to get one for under $30 USD*. People are trying to sell them at much higher prices. Shop around for your best price.
+
+### MQTT Broker and Home Assistant
+
 An MQTT broker is needed as the counterpart for this daemon.
 
 MQTT is huge help in connecting different parts of your smart home and setting up of a broker is quick and easy. In many cases you've already set one up when you installed Home Assistant.  
@@ -68,8 +75,8 @@ MQTT is huge help in connecting different parts of your smart home and setting u
 You'll need to know the hostname (or IP address) of the machine where the MQTT broker is running as well as the port it is listening to. This is typically the default MQTT port (1883).  
 *You will add this information to the config.ini for this script, as described below.*
 
-### Connecting the AS3935 to your Raspberry Pi
-You'll also need the AS3935 Lightning sensor connected (via I2C for now) to the RPi.  Here's the pinout I use:
+## Connecting the AS3935 to your Raspberry Pi
+You'll need the AS3935 Lightning sensor to be connected (via I2C for now) to your RPi.  Here's the pinout I use:
 
 | AS3935 Pin      | Module Pin | Raspberry Pi Pin |
 |-----------------|------------|------------------|
