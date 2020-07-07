@@ -512,6 +512,7 @@ UNITS_KEY = 'units'
 PERIOD__IN_MINUTES_KEY = 'period_minutes'
 TIMESTAMP_KEY = 'timestamp'
 LAST_DETECT_KEY = 'last'
+FIRST_DETECT_KEY = 'first'
 OUT_OF_RANGE_KEY = 'out_of_range'
 RING_COUNT_KEY = 'ring_count'
 RING_WIDTH_KEY = 'ring_width_km'
@@ -543,14 +544,17 @@ if len(binIndexesForThisRun) != MAX_DISTANCE_VALUES:
 #
 #  3-7 bins + overhead + OOR
 
-accumulatorBins = []
-accumulatorLastStrike = ''
+accumulatedDetections = []  # sliding window of period strikes, new on front tail evaporates at end of period
+accumulatorBins = []        # our rings (bins)
+accumulatorLastStrike = ''  # earliest detection timestamp
+accumulatorFirstStrike = ''  # latest detection timestamp
 accumulatorOutOfRangeCount = 0
 accumulatorBinDistances = []
 
-def init_empty_accumulator():
+def resetAccumulatorToEmpty():
     global accumulatorBins
     global accumulatorLastStrike
+    global accumulatorFirstStrike
     global accumulatorOutOfRangeCount
     # first empty our list if it wasn't
     accumulatorBins.clear
@@ -559,6 +563,7 @@ def init_empty_accumulator():
     # and reset these values
     accumulatorOutOfRangeCount = 0
     accumulatorLastStrike = ''
+    accumulatorFirstStrike = ''
 
 def calculate_ring_widths():
     global accumulatorBinDistances
@@ -600,46 +605,53 @@ def binIndexFromDistance(distance):
         raise TypeError("[CODE] WHAT?? Unexpected Value from detector[{}]!!  Aborting!".format(distance))
     return desiredBinIndex
 
+    # =========================================================================
+    #  we are moving to a new accumulation strategy
+    #   instead of accumulating directly into the bins we are going to keep
+    #   a moving window of strikes and push this moving window into the bins
+    #   only when we need to report the bin-set
+    #
+    # 
+    # -------------------------------------------------------------------------
+def ageDetections(accumulatedDetectionsList, period_in_minutes):
+    filteredList = accumulatedDetectionsList
+    timeNow = datetime.now()
+    # our TUPLE is: (timestamp, energy, distance, strikeCount)
+    #   chase from oldest to youngest...
+    removed_count = 0
+    for currDetection in accumulatedDetectionsList:
+        detectionTimestamp = currDetection[0]
+        timeDifference = timeNow - detectionTimestamp
+        detectionAgeInMinutes = timeDifference.seconds / 60
+        # if too old remove it then look at next
+        if detectionAgeInMinutes > period_in_minutes:
+            filteredList.remove(currDetection)
+            removed_count += 1
+        else:
+            # this one is young enough so no point in checking any more...
+            break
+
+    orig_count = len(accumulatedDetectionsList)
+    new_count = len(filteredList)
+    
+    print_line('adjusted detection set: enter with {} , leave with {}, removed {}'.format(orig_count, new_count, removed_count), debug=True)
+    return filteredList
 
 def accumulate(timestamp, energy, distance, strikeCount):
-    global accumulatorBins
-    global accumulatorLastStrike
-    global accumulatorOutOfRangeCount
-    # convert distance to bin index:
-    #   NOTE: 0 is overhead while 15 is 'out of range'
-    desiredBinIndex = binIndexFromDistance(distance)
-    accumulatorLastStrike = timestamp
-    if desiredBinIndex == 15:   # out-of-range
-        accumulatorOutOfRangeCount += 1
-    else:
-        desiredBin = accumulatorBins[desiredBinIndex]
-        if STRIKE_COUNT_KEY in desiredBin:
-            currCount = desiredBin[STRIKE_COUNT_KEY]
-        else:
-            currCount = 0
-        if TOTAL_ENERGY_KEY in desiredBin:
-            currTotalEnergy = desiredBin[TOTAL_ENERGY_KEY] 
-        else:
-            currTotalEnergy = 0
-        if ACCUM_COUNT_KEY in desiredBin:
-            currAccumCount = desiredBin[ACCUM_COUNT_KEY] 
-        else:
-            currAccumCount = 0
+    global accumulatedDetections
 
-        currTotalEnergy += energy
-        currAccumCount += 1
-        currCount += strikeCount
+    # append this to our list then remove old (outside of period) detections from the list
+    accumulatedDetections.append( (timestamp, energy, distance, strikeCount) )
+    accumulatedDetections = ageDetections(accumulatedDetections, period_in_minutes)
 
-        # real values for consumer  
-        desiredBin[STRIKE_COUNT_KEY] = currCount
-        desiredBin[ENERGY_KEY] = int(currTotalEnergy / currAccumCount)
-        # internal values so we can accumulate correctly
-        desiredBin[TOTAL_ENERGY_KEY] = currTotalEnergy
-        desiredBin[ACCUM_COUNT_KEY] = currAccumCount   
+def updateDetectionsAge():
+    global accumulatedDetections
+    accumulatedDetections = ageDetections(accumulatedDetections, period_in_minutes)
 
 def getDictionaryForAccumulatorNamed(dictionaryName):
     global accumulatorBins
     global accumulatorLastStrike
+    global accumulatorFirstStrike
     global accumulatorOutOfRangeCount
     # build a past dictionary and send it
     pastRingsData = OrderedDict()
@@ -648,6 +660,8 @@ def getDictionaryForAccumulatorNamed(dictionaryName):
     pastRingsData[TIMESTAMP_KEY] = current_timestamp.astimezone().replace(microsecond=0).isoformat()
     if accumulatorLastStrike != '':
         pastRingsData[LAST_DETECT_KEY] = accumulatorLastStrike.astimezone().replace(microsecond=0).isoformat() 
+    if accumulatorFirstStrike != '':
+        pastRingsData[FIRST_DETECT_KEY] = accumulatorFirstStrike.astimezone().replace(microsecond=0).isoformat() 
     pastRingsData[PERIOD__IN_MINUTES_KEY] = period_in_minutes
     pastRingsData[UNITS_KEY] = distance_as
     pastRingsData[OUT_OF_RANGE_KEY] = accumulatorOutOfRangeCount
@@ -691,6 +705,61 @@ def getDictionaryForAccumulatorNamed(dictionaryName):
     topRingsData[dictionaryName] = pastRingsData
     return topRingsData
 
+def loadDetectionsIntoBins():
+    global accumulatorBins
+    global accumulatorLastStrike
+    global accumulatorFirstStrike
+    global accumulatorOutOfRangeCount
+    global accumulatedDetections
+
+    # reset the current
+    resetAccumulatorToEmpty()
+
+    # our TUPLE is: (timestamp, energy, distance, strikeCount)
+    for currDetection in accumulatedDetections:
+        timestamp = currDetection[0]
+        energy = currDetection[1]
+        distance = currDetection[2]
+        strikeCount = currDetection[3]
+
+        # place earliest detection here
+        if accumulatorFirstStrike == '':
+            accumulatorFirstStrike = timestamp
+
+        # place latest detection here
+        accumulatorLastStrike = timestamp
+
+        # convert distance to bin index:
+        #   NOTE: 0 is overhead while 15 is 'out of range'
+        desiredBinIndex = binIndexFromDistance(distance)
+        if desiredBinIndex == 15:   # out-of-range
+            accumulatorOutOfRangeCount += 1
+        else:
+            desiredBin = accumulatorBins[desiredBinIndex]
+            if STRIKE_COUNT_KEY in desiredBin:
+                currCount = desiredBin[STRIKE_COUNT_KEY]
+            else:
+                currCount = 0
+            if TOTAL_ENERGY_KEY in desiredBin:
+                currTotalEnergy = desiredBin[TOTAL_ENERGY_KEY] 
+            else:
+                currTotalEnergy = 0
+            if ACCUM_COUNT_KEY in desiredBin:
+                currAccumCount = desiredBin[ACCUM_COUNT_KEY] 
+            else:
+                currAccumCount = 0
+
+            currTotalEnergy += energy
+            currAccumCount += 1
+            currCount += strikeCount
+
+            # real values for consumer  
+            desiredBin[STRIKE_COUNT_KEY] = currCount
+            desiredBin[ENERGY_KEY] = int(currTotalEnergy / currAccumCount)
+            # internal values so we can accumulate correctly
+            desiredBin[TOTAL_ENERGY_KEY] = currTotalEnergy
+            desiredBin[ACCUM_COUNT_KEY] = currAccumCount   
+
 def publishRingData(ringsData, topic):
     print_line('Publishing to MQTT topic "{}, Data:{}"'.format(topic, json.dumps(ringsData)))
     mqtt_client.publish('{}'.format(topic), json.dumps(ringsData), 1, retain=False)
@@ -698,14 +767,15 @@ def publishRingData(ringsData, topic):
 
 def put_accumulated_aside_and_report_it(topic):
     # build a past dictionary and send it
+    loadDetectionsIntoBins()
     pastRingsData = getDictionaryForAccumulatorNamed(PAST_RINGS_KEY)
-    # reset the current
-    init_empty_accumulator()
     # send the data
     _thread.start_new_thread(publishRingData, (pastRingsData, topic))
+    updateDetectionsAge()
 
 def report_current_accumulator(topic):
     # build a current dictionary and send it
+    loadDetectionsIntoBins()
     currRingsData = getDictionaryForAccumulatorNamed(CURR_RINGS_KEY)
     # send the data
     _thread.start_new_thread(publishRingData, (currRingsData, topic))
@@ -795,8 +865,11 @@ def handle_interrupt(channel):
         last_alert = datetime.min
         first_alert = datetime.min
 
-init_empty_accumulator()
+resetAccumulatorToEmpty()
 calculate_ring_widths()
+
+if opt_testing == True:
+    print_line('Testing - Detections taken from {}'.format(test_filename), verbose=True)
 
 if opt_testing == False:
     # Use a software Pull-Down on interrupt pin
@@ -855,6 +928,11 @@ else:
         sleep(wait_time)
         handle_interrupt(TEST_INTERRUPT)
         curr_time_in_seconds = dispatch_time_seconds
+
+    print_line("Test Detections ended...  waiting to detect storm end", verbose=True)
+    wait_time = 35 * 60 # storm is 30 minutes, let's add extra 5min... then convert to seconds
+    print_line('- waiting for {} seconds'.format(wait_time), debug=True)
+    sleep(wait_time)
 
     stopPeriodTimer()   # don't leave this running!
     stopAliveTimer()
