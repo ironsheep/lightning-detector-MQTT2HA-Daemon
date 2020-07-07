@@ -311,7 +311,9 @@ LD_DISTANCE = "distance"   # 5b value: 1=overhead, 63(0x3f)=out-of-range, 2-62 d
 LD_COUNT = "count"   # 5b value: 1=overhead, 63(0x3f)=out-of-range, 2-62 dist in km
 LD_CURRENT_RINGS = "crings"
 LD_PAST_RINGS = "prings"
+LD_SETTINGS = "settings"
 
+LDS_TIMESTAMP = "timestamp"
 LDS_MIN_STRIKES = "min_strikes" # 1,5,9,16
 LDS_LOCATION = "afe_inside" # indoors, outdoors
 LDS_LCO_ON_INT = "disp_lco" # T/F where T means LCO is transmitting on Intr pin (can't detect when this is true)
@@ -337,6 +339,7 @@ detectorValues = OrderedDict([
     (LD_ENERGY, dict(title="Energy")),
     (LD_DISTANCE, dict(title="Distance", unit=distance_as)),
     (LD_COUNT, dict(title="Count")),
+    (LD_SETTINGS, dict(title="Detector Settings", no_title_prefix="yes", json_values="yes")),
     (LD_CURRENT_RINGS, dict(title="Current RingSet", device_class="timestamp", no_title_prefix="yes", json_values="yes")),
     (LD_PAST_RINGS, dict(title="Past RingSet", device_class="timestamp", no_title_prefix="yes", json_values="yes"))
 ])
@@ -472,13 +475,20 @@ strikes_since_last_alert = 0
 # -----------------------------------------------------------------------------
 
 def send_settings(minStrikes, isIndoors, isDispLco, noiseFloor):
+    topSettingsData = OrderedDict()
+    
     settingsData = OrderedDict()
+    current_timestamp = datetime.now()
+    settingsData[LDS_TIMESTAMP] = current_timestamp.astimezone().replace(microsecond=0).isoformat()
     settingsData[LDS_MIN_STRIKES] = minStrikes
     settingsData[LDS_LOCATION] = isIndoors
     settingsData[LDS_LCO_ON_INT] = isDispLco
     settingsData[LDS_NOISE_FLOOR] = noiseFloor
-    print_line('Publishing to MQTT topic "{}, Data:{}"'.format(settings_topic, json.dumps(settingsData)))
-    mqtt_client.publish('{}'.format(settings_topic), json.dumps(settingsData), 1, retain=False)
+
+    topSettingsData['settings'] = settingsData
+
+    print_line('Publishing to MQTT topic "{}, Data:{}"'.format(settings_topic, json.dumps(topSettingsData)))
+    mqtt_client.publish('{}'.format(settings_topic), json.dumps(topSettingsData), 1, retain=False)
     sleep(0.5) # some slack for the publish roundtrip and callback function
 
 def send_status(timestamp, energy, distance, strikeCount):
@@ -513,6 +523,8 @@ PERIOD__IN_MINUTES_KEY = 'period_minutes'
 TIMESTAMP_KEY = 'timestamp'
 LAST_DETECT_KEY = 'last'
 FIRST_DETECT_KEY = 'first'
+STORM_LAST_DETECT_KEY = 'storm_last'
+STORM_FIRST_DETECT_KEY = 'storm_first'
 OUT_OF_RANGE_KEY = 'out_of_range'
 RING_COUNT_KEY = 'ring_count'
 RING_WIDTH_KEY = 'ring_width_km'
@@ -546,10 +558,19 @@ if len(binIndexesForThisRun) != MAX_DISTANCE_VALUES:
 
 accumulatedDetections = []  # sliding window of period strikes, new on front tail evaporates at end of period
 accumulatorBins = []        # our rings (bins)
-accumulatorLastStrike = ''  # earliest detection timestamp
-accumulatorFirstStrike = ''  # latest detection timestamp
+accumulatorLastStrike = ''  # earliest detection timestamp (this period)
+accumulatorFirstStrike = ''  # latest detection timestamp (this period)
+accumulatorStormLastStrike = ''  # earliest detection timestamp (whole storm)
+accumulatorStormFirstStrike = ''  # latest detection timestamp (whole storm)
 accumulatorOutOfRangeCount = 0
 accumulatorBinDistances = []
+
+
+def resetStormTracking():
+    global accumulatorStormLastStrike
+    global accumulatorStormFirstStrike
+    accumulatorStormLastStrike = ''
+    accumulatorStormFirstStrike = ''
 
 def resetAccumulatorToEmpty():
     global accumulatorBins
@@ -614,7 +635,7 @@ def binIndexFromDistance(distance):
     # 
     # -------------------------------------------------------------------------
 def ageDetections(accumulatedDetectionsList, period_in_minutes):
-    filteredList = accumulatedDetectionsList
+    filteredList = accumulatedDetectionsList.copy()
     timeNow = datetime.now()
     # our TUPLE is: (timestamp, energy, distance, strikeCount)
     #   chase from oldest to youngest...
@@ -644,14 +665,17 @@ def accumulate(timestamp, energy, distance, strikeCount):
     accumulatedDetections.append( (timestamp, energy, distance, strikeCount) )
     accumulatedDetections = ageDetections(accumulatedDetections, period_in_minutes)
 
-def updateDetectionsAge():
+def removeOldDetections():
     global accumulatedDetections
     accumulatedDetections = ageDetections(accumulatedDetections, period_in_minutes)
+
 
 def getDictionaryForAccumulatorNamed(dictionaryName):
     global accumulatorBins
     global accumulatorLastStrike
     global accumulatorFirstStrike
+    global accumulatorStormLastStrike
+    global accumulatorStormFirstStrike
     global accumulatorOutOfRangeCount
     # build a past dictionary and send it
     pastRingsData = OrderedDict()
@@ -662,6 +686,10 @@ def getDictionaryForAccumulatorNamed(dictionaryName):
         pastRingsData[LAST_DETECT_KEY] = accumulatorLastStrike.astimezone().replace(microsecond=0).isoformat() 
     if accumulatorFirstStrike != '':
         pastRingsData[FIRST_DETECT_KEY] = accumulatorFirstStrike.astimezone().replace(microsecond=0).isoformat() 
+    if accumulatorStormLastStrike != '':
+        pastRingsData[STORM_LAST_DETECT_KEY] = accumulatorStormLastStrike.astimezone().replace(microsecond=0).isoformat() 
+    if accumulatorStormFirstStrike != '':
+        pastRingsData[STORM_FIRST_DETECT_KEY] = accumulatorStormFirstStrike.astimezone().replace(microsecond=0).isoformat() 
     pastRingsData[PERIOD__IN_MINUTES_KEY] = period_in_minutes
     pastRingsData[UNITS_KEY] = distance_as
     pastRingsData[OUT_OF_RANGE_KEY] = accumulatorOutOfRangeCount
@@ -709,6 +737,8 @@ def loadDetectionsIntoBins():
     global accumulatorBins
     global accumulatorLastStrike
     global accumulatorFirstStrike
+    global accumulatorStormLastStrike
+    global accumulatorStormFirstStrike
     global accumulatorOutOfRangeCount
     global accumulatedDetections
 
@@ -725,9 +755,11 @@ def loadDetectionsIntoBins():
         # place earliest detection here
         if accumulatorFirstStrike == '':
             accumulatorFirstStrike = timestamp
-
+        if accumulatorStormFirstStrike == '':
+            accumulatorStormFirstStrike = timestamp
         # place latest detection here
         accumulatorLastStrike = timestamp
+        accumulatorStormLastStrike = timestamp
 
         # convert distance to bin index:
         #   NOTE: 0 is overhead while 15 is 'out of range'
@@ -765,13 +797,12 @@ def publishRingData(ringsData, topic):
     mqtt_client.publish('{}'.format(topic), json.dumps(ringsData), 1, retain=False)
     sleep(0.5) # some slack for the publish roundtrip and callback function  
 
-def put_accumulated_aside_and_report_it(topic):
+def report_past_accumulator(topic):
     # build a past dictionary and send it
     loadDetectionsIntoBins()
     pastRingsData = getDictionaryForAccumulatorNamed(PAST_RINGS_KEY)
     # send the data
     _thread.start_new_thread(publishRingData, (pastRingsData, topic))
-    updateDetectionsAge()
 
 def report_current_accumulator(topic):
     # build a current dictionary and send it
@@ -832,8 +863,10 @@ def handle_interrupt(channel):
 
             # if we are past the end of this period then snap it and start accumulating all over
             if (current_timestamp - last_alert).seconds > period_in_minutes * 60 and last_alert != datetime.min:
-                put_accumulated_aside_and_report_it(prings_topic)
+                print_line(sourceID + " >> Period ended, with detection in hand... reporting past first...")
+                report_past_accumulator(prings_topic)
                 strikes_since_last_alert = 1    # reset this since count just reported
+                startPeriodTimer()  # RESET timer so it doesn't expire for another 'period_in_minutes'
 
             # ok, report our new detection to MQTT
             _thread.start_new_thread(send_status, (current_timestamp, energy, distance, strikes_since_last_alert))
@@ -849,7 +882,9 @@ def handle_interrupt(channel):
         # have period-end-timer interrupt!
         #   assume we are at the end of this period, snap it and start accumulating all over
         print_line(sourceID + " >> Period ended, waiting for next detection")
-        put_accumulated_aside_and_report_it(prings_topic)
+        report_past_accumulator(prings_topic)
+        removeOldDetections()
+        report_current_accumulator(crings_topic)
         # we snapped counters so reset count
         strikes_since_last_alert = 0
 
@@ -858,7 +893,10 @@ def handle_interrupt(channel):
         #_thread.start_new_thread(send_tweet, (
         #        "\o/ Thunderstorm over. No new flash detected for last 1/2h.",))
         print_line(sourceID + " >> Storm ended, waiting for next detection")
-        report_current_accumulator(prings_topic)
+        report_past_accumulator(prings_topic)
+        removeOldDetections()
+        report_current_accumulator(crings_topic)
+        resetStormTracking()    # kill awareness of any storm 
         stopPeriodTimer()   #  kill our timer until our next detection
         #  reset our indicators
         strikes_since_last_alert = 0
@@ -867,9 +905,6 @@ def handle_interrupt(channel):
 
 resetAccumulatorToEmpty()
 calculate_ring_widths()
-
-if opt_testing == True:
-    print_line('Testing - Detections taken from {}'.format(test_filename), verbose=True)
 
 if opt_testing == False:
     # Use a software Pull-Down on interrupt pin
@@ -901,15 +936,24 @@ if opt_testing == False:
             handle_interrupt(pin)
     finally:
         # cleanup used pins... just because we like cleaning up after us
-        stopPeriodTimer()   # don't leave this running!
+        stopPeriodTimer()   # don't leave our timers running!
         stopAliveTimer()
         GPIO.cleanup()
 
 else:
+
     # we ARE testing, meaning we are loading detection info from our test file!
     # LINE IS: record-nbr, time-seconds, dist_km, energy
     test_file = open(test_filename, "r")
     lines = test_file.readlines()
+
+    detection_count = 0
+    for currLine in lines:
+        if currLine.startswith("#"):
+            continue
+        detection_count += 1
+
+    print_line('TESTing: - Running {} detections from "{}"'.format(detection_count, test_filename), verbose=True)
 
     curr_time_in_seconds = 0.0
     for currLine in lines:
@@ -929,10 +973,10 @@ else:
         handle_interrupt(TEST_INTERRUPT)
         curr_time_in_seconds = dispatch_time_seconds
 
-    print_line("Test Detections ended...  waiting to detect storm end", verbose=True)
-    wait_time = 35 * 60 # storm is 30 minutes, let's add extra 5min... then convert to seconds
+    print_line("TESTing: Detections ended...  waiting to detect storm end", verbose=True)
+    wait_time = 35 * 60 # storm is 30 minutes, let's add extra 5 min... then convert to seconds
     print_line('- waiting for {} seconds'.format(wait_time), debug=True)
     sleep(wait_time)
 
-    stopPeriodTimer()   # don't leave this running!
+    stopPeriodTimer()   # don't leave our timers running!
     stopAliveTimer()
