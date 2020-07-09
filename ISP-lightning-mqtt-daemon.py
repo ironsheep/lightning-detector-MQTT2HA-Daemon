@@ -519,7 +519,7 @@ ACCUM_COUNT_KEY = 'accumulated_count'   #internal
 # top keys
 RING_PREFIX_KEY = 'ring'
 UNITS_KEY = 'units'
-PERIOD__IN_MINUTES_KEY = 'period_minutes'
+PERIOD_IN_MINUTES_KEY = 'period_minutes'
 TIMESTAMP_KEY = 'timestamp'
 LAST_DETECT_KEY = 'last'
 FIRST_DETECT_KEY = 'first'
@@ -571,6 +571,7 @@ def resetStormTracking():
     global accumulatorStormFirstStrike
     accumulatorStormLastStrike = ''
     accumulatorStormFirstStrike = ''
+    print_line('Removing all storm knowledge (reset)', debug=True)
 
 def resetAccumulatorToEmpty():
     global accumulatorBins
@@ -668,6 +669,7 @@ def accumulate(timestamp, energy, distance, strikeCount):
 def removeOldDetections():
     global accumulatedDetections
     accumulatedDetections = ageDetections(accumulatedDetections, period_in_minutes)
+    print_line('Removing old detections from set', debug=True)
 
 
 def getDictionaryForAccumulatorNamed(dictionaryName):
@@ -678,23 +680,23 @@ def getDictionaryForAccumulatorNamed(dictionaryName):
     global accumulatorStormFirstStrike
     global accumulatorOutOfRangeCount
     # build a past dictionary and send it
-    pastRingsData = OrderedDict()
+    tmpRingsDict = OrderedDict()
 
     current_timestamp = datetime.now()
-    pastRingsData[TIMESTAMP_KEY] = current_timestamp.astimezone().replace(microsecond=0).isoformat()
+    tmpRingsDict[TIMESTAMP_KEY] = current_timestamp.astimezone().replace(microsecond=0).isoformat()
     if accumulatorLastStrike != '':
-        pastRingsData[LAST_DETECT_KEY] = accumulatorLastStrike.astimezone().replace(microsecond=0).isoformat() 
+        tmpRingsDict[LAST_DETECT_KEY] = accumulatorLastStrike.astimezone().replace(microsecond=0).isoformat() 
     if accumulatorFirstStrike != '':
-        pastRingsData[FIRST_DETECT_KEY] = accumulatorFirstStrike.astimezone().replace(microsecond=0).isoformat() 
+        tmpRingsDict[FIRST_DETECT_KEY] = accumulatorFirstStrike.astimezone().replace(microsecond=0).isoformat() 
     if accumulatorStormLastStrike != '':
-        pastRingsData[STORM_LAST_DETECT_KEY] = accumulatorStormLastStrike.astimezone().replace(microsecond=0).isoformat() 
+        tmpRingsDict[STORM_LAST_DETECT_KEY] = accumulatorStormLastStrike.astimezone().replace(microsecond=0).isoformat() 
     if accumulatorStormFirstStrike != '':
-        pastRingsData[STORM_FIRST_DETECT_KEY] = accumulatorStormFirstStrike.astimezone().replace(microsecond=0).isoformat() 
-    pastRingsData[PERIOD__IN_MINUTES_KEY] = period_in_minutes
-    pastRingsData[UNITS_KEY] = distance_as
-    pastRingsData[OUT_OF_RANGE_KEY] = accumulatorOutOfRangeCount
-    pastRingsData[RING_COUNT_KEY] = number_of_rings    
-    pastRingsData[RING_WIDTH_KEY] = round((40 - 5) / number_of_rings, 1)
+        tmpRingsDict[STORM_FIRST_DETECT_KEY] = accumulatorStormFirstStrike.astimezone().replace(microsecond=0).isoformat() 
+    tmpRingsDict[PERIOD_IN_MINUTES_KEY] = period_in_minutes
+    tmpRingsDict[UNITS_KEY] = distance_as
+    tmpRingsDict[OUT_OF_RANGE_KEY] = accumulatorOutOfRangeCount
+    tmpRingsDict[RING_COUNT_KEY] = number_of_rings    
+    tmpRingsDict[RING_WIDTH_KEY] = round((40 - 5) / number_of_rings, 1)
 
     if distance_as == val_distance_as_km:
         distance_multiplier = 1.0
@@ -727,10 +729,10 @@ def getDictionaryForAccumulatorNamed(dictionaryName):
         else:
             singleRingData[ENERGY_KEY] = 0
         ringName = "ring{}".format(ringIndex)
-        pastRingsData[ringName] = singleRingData
+        tmpRingsDict[ringName] = singleRingData
 
     topRingsData = OrderedDict()
-    topRingsData[dictionaryName] = pastRingsData
+    topRingsData[dictionaryName] = tmpRingsDict
     return topRingsData
 
 def loadDetectionsIntoBins():
