@@ -27,7 +27,7 @@ import sdnotify
 from signal import signal, SIGPIPE, SIG_DFL
 signal(SIGPIPE,SIG_DFL)
 
-script_version = "2.0.1"
+script_version = "2.0.2"
 script_name = 'ISP-lightning-mqtt-daemon.py'
 script_info = '{} v{}'.format(script_name, script_version)
 project_name = 'lightning-detector-MQTT2HA-Daemon'
@@ -543,6 +543,7 @@ LAST_DETECT_KEY = 'last'
 FIRST_DETECT_KEY = 'first'
 STORM_LAST_DETECT_KEY = 'storm_last'
 STORM_FIRST_DETECT_KEY = 'storm_first'
+STORM_END_MINUTES_KEY = 'storm_end_minutes'
 OUT_OF_RANGE_KEY = 'out_of_range'
 RING_COUNT_KEY = 'ring_count'
 RING_WIDTH_KEY = 'ring_width_km'
@@ -679,9 +680,17 @@ def ageDetections(accumulatedDetectionsList, period_in_minutes):
 
 def accumulate(timestamp, energy, distance, strikeCount):
     global accumulatedDetections
+    global accumulatorStormLastStrike
+    global accumulatorStormFirstStrike
 
     # append this to our list then remove old (outside of period) detections from the list
     accumulatedDetections.append( (timestamp, energy, distance, strikeCount) )
+
+    if(accumulatorStormFirstStrike == ''):
+        accumulatorStormFirstStrike = timestamp
+
+    accumulatorStormLastStrike = timestamp
+
     accumulatedDetections = ageDetections(accumulatedDetections, period_in_minutes)
 
 def removeOldDetections():
@@ -710,6 +719,7 @@ def getDictionaryForAccumulatorNamed(dictionaryName):
         tmpRingsDict[STORM_LAST_DETECT_KEY] = accumulatorStormLastStrike.astimezone().replace(microsecond=0).isoformat() 
     if accumulatorStormFirstStrike != '':
         tmpRingsDict[STORM_FIRST_DETECT_KEY] = accumulatorStormFirstStrike.astimezone().replace(microsecond=0).isoformat() 
+    tmpRingsDict[STORM_END_MINUTES_KEY] = end_storm_after_minutes
     tmpRingsDict[PERIOD_IN_MINUTES_KEY] = period_in_minutes
     tmpRingsDict[UNITS_KEY] = distance_as
     tmpRingsDict[OUT_OF_RANGE_KEY] = accumulatorOutOfRangeCount
@@ -757,8 +767,6 @@ def loadDetectionsIntoBins():
     global accumulatorBins
     global accumulatorLastStrike
     global accumulatorFirstStrike
-    global accumulatorStormLastStrike
-    global accumulatorStormFirstStrike
     global accumulatorOutOfRangeCount
     global accumulatedDetections
 
@@ -775,11 +783,9 @@ def loadDetectionsIntoBins():
         # place earliest detection here
         if accumulatorFirstStrike == '':
             accumulatorFirstStrike = timestamp
-        if accumulatorStormFirstStrike == '':
-            accumulatorStormFirstStrike = timestamp
+        
         # place latest detection here
         accumulatorLastStrike = timestamp
-        accumulatorStormLastStrike = timestamp
 
         # convert distance to bin index:
         #   NOTE: 0 is overhead while 15 is 'out of range'
