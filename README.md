@@ -179,14 +179,25 @@ An example:
 
 This data can then be subscribed to and processed by your home assistant installation.  
 
-Additionally, the detector settings are written to: "`{base_topic}/{sensorName}/settings`" with the following fields:
+Additionally, the detector settings along with script settings are written to: "`{base_topic}/{sensorName}/settings`" with the following fields:
 
 ```json
 {
-  "min_strikes": 5,
-  "afe_inside": true,
-  "disp_lco": false,
-  "noise_floor": 1
+  "settings": {
+    "timestamp": "2020-07-10T12:52:07-06:00",
+    "detector": {
+      "min_strikes": 5,
+      "afe_inside": true,
+      "disp_lco": false,
+      "noise_floor": 1
+    },
+    "script": {
+      "period_in_minutes": 5,
+      "end_storm_minutes": 30,
+      "number_of_rings": 5,
+      "distance_units": "km"
+    }
+  }
 }
 ```
 

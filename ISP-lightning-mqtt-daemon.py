@@ -27,7 +27,7 @@ import sdnotify
 from signal import signal, SIGPIPE, SIG_DFL
 signal(SIGPIPE,SIG_DFL)
 
-script_version = "2.0.0"
+script_version = "2.0.1"
 script_name = 'ISP-lightning-mqtt-daemon.py'
 script_info = '{} v{}'.format(script_name, script_version)
 project_name = 'lightning-detector-MQTT2HA-Daemon'
@@ -468,7 +468,7 @@ strikes_since_last_alert = 0
 #  MQTT Transmit Helper Routines
 # -----------------------------------------------------------------------------
 LDS_TIMESTAMP = "timestamp"
-LDS_CAT_HARDWARE = "hardware"
+LDS_CAT_HARDWARE = "detector"
 LDS_MIN_STRIKES = "min_strikes" # 1,5,9,16
 LDS_LOCATION = "afe_inside" # indoors, outdoors
 LDS_LCO_ON_INT = "disp_lco" # T/F where T means LCO is transmitting on Intr pin (can't detect when this is true)
