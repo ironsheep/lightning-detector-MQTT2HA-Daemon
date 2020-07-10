@@ -27,7 +27,7 @@ import sdnotify
 from signal import signal, SIGPIPE, SIG_DFL
 signal(SIGPIPE,SIG_DFL)
 
-script_version = "1.3.0"
+script_version = "2.0.0"
 script_name = 'ISP-lightning-mqtt-daemon.py'
 script_info = '{} v{}'.format(script_name, script_version)
 project_name = 'lightning-detector-MQTT2HA-Daemon'
@@ -154,6 +154,7 @@ val_distance_as_km = 'km'
 val_distance_as_mi = 'mi'
 default_distance_as = val_distance_as_km  # [km|mi]
 distance_as = config['Behavior'].get('distance_as', default_distance_as)
+
 
 
 # GPIO pin used for interrupts
@@ -313,13 +314,6 @@ LD_CURRENT_RINGS = "crings"
 LD_PAST_RINGS = "prings"
 LD_SETTINGS = "settings"
 
-LDS_TIMESTAMP = "timestamp"
-LDS_MIN_STRIKES = "min_strikes" # 1,5,9,16
-LDS_LOCATION = "afe_inside" # indoors, outdoors
-LDS_LCO_ON_INT = "disp_lco" # T/F where T means LCO is transmitting on Intr pin (can't detect when this is true)
-LDS_NOISE_FLOOR = "noise_floor" # [0-7]
-
-
 # what device are we on?
 gw = os.popen("ip -4 route show default").read().split()
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -339,7 +333,7 @@ detectorValues = OrderedDict([
     (LD_ENERGY, dict(title="Energy")),
     (LD_DISTANCE, dict(title="Distance", unit=distance_as)),
     (LD_COUNT, dict(title="Count")),
-    (LD_SETTINGS, dict(title="Detector Settings", no_title_prefix="yes", json_values="yes")),
+    (LD_SETTINGS, dict(title="Detector Settings", device_class="timestamp", no_title_prefix="yes", json_values="yes")),
     (LD_CURRENT_RINGS, dict(title="Current RingSet", device_class="timestamp", no_title_prefix="yes", json_values="yes")),
     (LD_PAST_RINGS, dict(title="Past RingSet", device_class="timestamp", no_title_prefix="yes", json_values="yes"))
 ])
@@ -473,17 +467,41 @@ strikes_since_last_alert = 0
 # -----------------------------------------------------------------------------
 #  MQTT Transmit Helper Routines
 # -----------------------------------------------------------------------------
+LDS_TIMESTAMP = "timestamp"
+LDS_CAT_HARDWARE = "hardware"
+LDS_MIN_STRIKES = "min_strikes" # 1,5,9,16
+LDS_LOCATION = "afe_inside" # indoors, outdoors
+LDS_LCO_ON_INT = "disp_lco" # T/F where T means LCO is transmitting on Intr pin (can't detect when this is true)
+LDS_NOISE_FLOOR = "noise_floor" # [0-7]
+
+LDS_CAT_SCRIPT = "script"
+LDS_PERIOD_IN_MINUTES = "period_in_minutes"
+LDS_END_STORM_IN_MINUTES = "end_storm_minutes"
+LDS_NUMBER_RINGS = "number_of_rings"
+LDS_DISTANCE_UNITS = "distance_units"
 
 def send_settings(minStrikes, isIndoors, isDispLco, noiseFloor):
     topSettingsData = OrderedDict()
-    
-    settingsData = OrderedDict()
+
+
     current_timestamp = datetime.now()
     settingsData[LDS_TIMESTAMP] = current_timestamp.astimezone().replace(microsecond=0).isoformat()
-    settingsData[LDS_MIN_STRIKES] = minStrikes
-    settingsData[LDS_LOCATION] = isIndoors
-    settingsData[LDS_LCO_ON_INT] = isDispLco
-    settingsData[LDS_NOISE_FLOOR] = noiseFloor
+
+    hardwareData = OrderedDict()
+    hardwareData[LDS_MIN_STRIKES] = minStrikes
+    hardwareData[LDS_LOCATION] = isIndoors
+    hardwareData[LDS_LCO_ON_INT] = isDispLco
+    hardwareData[LDS_NOISE_FLOOR] = noiseFloor
+
+    settingsData[LDS_CAT_HARDWARE] = hardwareData  
+
+    scriptData = OrderedDict()
+    scriptData[LDS_PERIOD_IN_MINUTES] = period_in_minutes
+    scriptData[LDS_END_STORM_IN_MINUTES] = end_storm_after_minutes
+    scriptData[LDS_NUMBER_RINGS] = number_of_rings
+    scriptData[LDS_DISTANCE_UNITS] = distance_as
+
+    settingsData[LDS_CAT_SCRIPT] = scriptData
 
     topSettingsData['settings'] = settingsData
 
