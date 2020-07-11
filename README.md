@@ -185,7 +185,7 @@ Additionally, the detector settings along with script settings are written to: "
 {
   "settings": {
     "timestamp": "2020-07-10T12:52:07-06:00",
-    "detector": {
+    "hardware": {
       "min_strikes": 5,
       "afe_inside": true,
       "disp_lco": false,
