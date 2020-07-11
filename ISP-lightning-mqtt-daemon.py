@@ -468,16 +468,16 @@ strikes_since_last_alert = 0
 #  MQTT Transmit Helper Routines
 # -----------------------------------------------------------------------------
 LDS_TIMESTAMP = "timestamp"
-LDS_CAT_HARDWARE = "detector"
+LDS_CAT_HARDWARE = "hardware"
 LDS_MIN_STRIKES = "min_strikes" # 1,5,9,16
 LDS_LOCATION = "afe_inside" # indoors, outdoors
 LDS_LCO_ON_INT = "disp_lco" # T/F where T means LCO is transmitting on Intr pin (can't detect when this is true)
 LDS_NOISE_FLOOR = "noise_floor" # [0-7]
 
 LDS_CAT_SCRIPT = "script"
-LDS_PERIOD_IN_MINUTES = "period_in_minutes"
-LDS_END_STORM_IN_MINUTES = "end_storm_minutes"
-LDS_NUMBER_RINGS = "number_of_rings"
+LDS_PERIOD_IN_MINUTES = "period_minutes"
+LDS_END_STORM_IN_MINUTES = "end_minutes"
+LDS_NUMBER_RINGS = "number_rings"
 LDS_DISTANCE_UNITS = "distance_units"
 
 def send_settings(minStrikes, isIndoors, isDispLco, noiseFloor):
@@ -543,7 +543,7 @@ LAST_DETECT_KEY = 'last'
 FIRST_DETECT_KEY = 'first'
 STORM_LAST_DETECT_KEY = 'storm_last'
 STORM_FIRST_DETECT_KEY = 'storm_first'
-STORM_END_MINUTES_KEY = 'storm_end_minutes'
+STORM_END_MINUTES_KEY = 'end_minutes'
 OUT_OF_RANGE_KEY = 'out_of_range'
 RING_COUNT_KEY = 'ring_count'
 RING_WIDTH_KEY = 'ring_width_km'
