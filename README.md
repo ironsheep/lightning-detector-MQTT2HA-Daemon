@@ -10,13 +10,13 @@ With this new sensor and an upcoming new **Lovelace card** (links below) you can
 
 When this script/daemon is run it will broadcast discovery topics via MQTT decribing this new sensor to home assistant.  If you have MQTT Discovery enabled then this new sensor will appear as a new device in Home Assistant: (where the "Firmware: v...." will be the version number of this script that you've just set up.)
 
-![Discovered by Home Assistant](Docs/images/DiscoveryV1.2.png)
+![Discovered by Home Assistant](Docs/images/DiscoveryV2.0.png)
 
 This script can be configured to be run in **daemon mode** continously in the background as a systemd service.
 
-## Support
+---
 
-Hey dude! Help me out for a couple of :coffee:'s or :pizza: slices!
+Hey, I will always appreciate your helping me out for a couple of :coffee:'s or :pizza: slices!
 
 [![coffee](https://www.buymeacoffee.com/assets/img/custom_images/black_img.png)](https://www.buymeacoffee.com/ironsheep)
 
@@ -91,7 +91,7 @@ You'll need the AS3935 Lightning sensor to be connected (via I2C for now) to you
 ## Installation
 
 On a modern Linux system just a few steps are needed to get the daemon working.
-The following example shows the installation under Debian/Raspbian below the `/opt` directory:
+The following example shows the installation on Debian/Raspbian below the `/opt` directory:
 
 ```shell
 sudo apt install git python3 python3-pip
@@ -160,7 +160,7 @@ This can be done by running it as a daemon.
    sudo systemctl enable isp-lightning.service
    ```
    
-   *NOTE: we use a symbolic link 'ln -s' so that when you list the files in /etc/systemd/system the link will point back to where your project in installed.  You'll see that many of your packages do this.*
+   *NOTE: we use a symbolic link 'ln -s' so that when you list the files in /etc/systemd/system the link will point back to where your project in installed.  You'll see that many other packages installed on your system already do this.*
    
 ## Integration
 
@@ -208,7 +208,7 @@ Lastly, there are two additional topics published which are used to drive our ne
 
 
 ## Lovelace Card for Home Assistant
-Want to go further?  Shortly there will be a new [Lovelace Lightning Detector Card](https://github.com/ironsheep/lovelace-lightning-detector-card) specifically for visualizing lightning data. We are working on it now... Watch that project for further updates.
+Want to go further?  There is a [Lovelace Lightning Detector Card](https://github.com/ironsheep/lovelace-lightning-detector-card) built specifically for visualizing this lightning data. 
 
 
 ## Credits
