@@ -1,8 +1,11 @@
 # lightning-detector-MQTT2HA-Daemon
 
 ![Project Maintenance][maintenance-shield]
+[![GitHub Activity][commits-shield]][commits]
 
+[![License][license-shield]](LICENSE)
 
+[![GitHub Release][releases-shield]][releases]
 
 A simple Linux python script to monitor the AS3935 Lightning Detector attached to the Raspberry Pi on which it is running and report information from the detector via MQTT to your Home Assistant installation.
 
@@ -226,7 +229,9 @@ Thank you to also Thomas Dietrich for providing a wonderful pattern for this pro
 > This project is a community project not for commercial use.
 > The authors will not be held responsible in the event of device failure or failure to detect any potentially damaging lightning.
 >
-> This project is in no way affiliated with, authorized, maintained, sponsored or endorsed by *Raspberry Pi (Trading) Ltd.* or any of its affiliates or subsidiaries.
+> This project is in no way affiliated with, authorized, maintained, sponsored or endorsed by *Raspberry Pi (Trading) Ltd.* or any of its affiliates or subsidiaries.  
+> 
+> This project is also in no way affiliated with, authorized, maintained, sponsored or endorsed by *Austria Micro Systems - ams AG*, makers of the AS3935 Lightning Sensor.
 
 ----
 
