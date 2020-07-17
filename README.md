@@ -1,6 +1,7 @@
 # lightning-detector-MQTT2HA-Daemon
 
 ![Project Maintenance][maintenance-shield]
+
 [![GitHub Activity][commits-shield]][commits]
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
@@ -9,7 +10,7 @@
 
 A simple Linux python script to monitor the AS3935 Lightning Detector attached to the Raspberry Pi on which it is running and report information from the detector via MQTT to your Home Assistant installation.
 
-With this new sensor and an upcoming new **Lovelace card** (links below) you can monitor lightning presence in your local area.
+With this new sensor and a new **Lovelace card** (links below) you can monitor lightning presence in your local area.
 
 When this script/daemon is run it will broadcast discovery topics via MQTT decribing this new sensor to home assistant.  If you have MQTT Discovery enabled then this new sensor will appear as a new device in Home Assistant: (where the "Firmware: v...." will be the version number of this script that you've just set up.)
 
@@ -28,13 +29,13 @@ Hey, I will always appreciate your helping me out for a couple of :coffee:'s or 
 * Tested with Home Assistant v0.111.0
 * Tested with Mosquitto broker v5.1
 * Data is published via MQTT
-* QTT discovery messages are sent so the detector is automatically registered with Home Assistant (if MQTT discovery is enabled in your installation)
+* MQTT discovery messages are sent so the detector is automatically registered with Home Assistant (if MQTT discovery is enabled in your installation)
 * MQTT authentication support
-* Supports MQTT LWT so you can tell when the script is running
+* Supports MQTT LWT so you can tell when the script is running (or if for some reason it has stopped running)
 * No special/root privileges are required by this mechanism
 * Linux daemon / systemd service, sd\_notify messages generated
 
-### Lightning Detector Device
+## Lightning Detector Device
 The AS3935 Lightning Detector monitored by this script is reported as:
 
 | Name            | Description |
