@@ -132,40 +132,47 @@ python3 /opt/ISP-lightning-mqtt-daemon/ISP-lightning-mqtt-daemon.py --config /op
 
 
 ### Run as Daemon / Service
-----
->      ** CAUTION **
->   
->      Run as daemon is NOT YET working correctly. i'll be posting an update
->      as soon as I have the fix to this in place.  For now you can run from 
->      command-line which works but - as a daemon it is not yet starting.   
->
->         MORE SOON!
->       
->      ** CAUTION **
-
-----
 
 You probably want to execute this script **continuously in the background**.
-This can be done by running it as a daemon.
+
+This can be done by running it as a daemon via the Systemd service - on systemd managed systems (the **recommended** option)
 
 **NOTE:** Daemon mode must be enabled in the configuration file (default).
 
-- via Systemd service - on systemd managed systems (the **recommended** option)
+By default the **isp-lightning.service** file indicates that the script should be run as user:group  **daemon:daemon**.  As this script requires access to i2c and gpio you'll want to add access to them for the daemon user as folows:
 
-   ```shell
+
+   ```shell   
+   # list current groups
+   groups daemon 
+   $ daemon : daemon
+
+   # add i2c, gpio if not present
+   sudo usermod daemon -a -G i2c,gpio
+   
+   # list current groups
+   groups daemon
+   $ daemon : daemon i2c gpio
+   #                 ^^^^^^^^ now they are present
+   ```
+
+Now that the 'daemon' user is configured to allow access the hardware you can setup the script to be run as a system service as follows:
+
+
+ ```shell
    sudo ln -s /opt/ISP-RPi-mqtt-daemon/isp-lightning.service /etc/systemd/system/isp-lightning.service
-
+   
    sudo systemctl daemon-reload
 
    sudo systemctl start isp-lightning.service
    sudo systemctl status isp-lightning.service
 
    sudo systemctl enable isp-lightning.service
-   ```
+ ```
    
    *NOTE: we use a symbolic link 'ln -s' so that when you list the files in /etc/systemd/system the link will point back to where your project in installed.  You'll see that many other packages installed on your system already do this.*
    
-## Integration
+## Integration with MQTT and Home Assistant
 
 Detection values will be published to the (configurable) MQTT broker topic "`{base_topic}/{sensorName}/detect`" (e.g. `home/nodes/lightning01/detect`).
 
