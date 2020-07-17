@@ -8,12 +8,12 @@ Type=notify
 User=daemon
 Group=daemon
 WorkingDirectory=/opt/ISP-lightning-mqtt-daemon/
-ExecStart=/usr/bin/python3 /opt/ISP-lightning-mqtt-daemon/ISP-lightning-mqtt-daemon.py
+ExecStart=/usr/bin/python3 -u /opt/ISP-lightning-mqtt-daemon/ISP-lightning-mqtt-daemon.py
 StandardOutput=null
 #StandardOutput=syslog
 #SyslogIdentifier=ISPliDet
 StandardError=journal
-Environment=PYTHONUNBUFFERED=true
+Environment=PYTHONUNBUFFERED=1
 Restart=always
 
 [Install]
