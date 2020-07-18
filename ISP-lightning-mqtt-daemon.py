@@ -877,7 +877,7 @@ def handle_interrupt(channel):
                 startPeriodTimer()  # start our period
                 first_alert = current_timestamp # remember when storm first started
             print_line(sourceID + " >> We sensed lightning! (%s)" % current_timestamp.strftime('%H:%M:%S - %Y/%m/%d'))
-            if (current_timestamp - last_alert).seconds < 3:
+            if last_alert != datetime.min and (current_timestamp - last_alert).seconds < 3:
                 print_line(" -- Last strike is too recent, incrementing counter since last alert.")
                 strikes_since_last_alert += 1
                 return
@@ -892,7 +892,7 @@ def handle_interrupt(channel):
             print_line(" -- Energy: " + str(energy) + " - distance: " + str(distance) + "km")
 
             # if we are past the end of this period then snap it and start accumulating all over
-            if (current_timestamp - last_alert).seconds > period_in_minutes * 60 and last_alert != datetime.min:
+            if last_alert != datetime.min and (current_timestamp - last_alert).seconds > period_in_minutes * 60:
                 print_line(sourceID + " >> Period ended, with detection in hand... reporting past first...")
                 report_past_accumulator(prings_topic)
                 strikes_since_last_alert = 1    # reset this since count just reported
@@ -919,7 +919,7 @@ def handle_interrupt(channel):
         strikes_since_last_alert = 0
 
     # If no strike has been detected for the last hour, reset the strikes_since_last_alert (consider storm finished)
-    if (current_timestamp - last_alert).seconds > end_storm_after_minutes * 60 and last_alert != datetime.min:
+    if last_alert != datetime.min and (current_timestamp - last_alert).seconds > end_storm_after_minutes * 60:
         #_thread.start_new_thread(send_tweet, (
         #        "\o/ Thunderstorm over. No new flash detected for last 1/2h.",))
         print_line(sourceID + " >> Storm ended, waiting for next detection")
