@@ -7,3 +7,4 @@ RPi-AS3935>=0.2.0
 RPi.GPIO>=0.5.11
 colorama>=0.4.3
 smbus>=1.1
+tzlocal>=1.3

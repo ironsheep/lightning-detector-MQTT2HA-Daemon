@@ -4,6 +4,7 @@ from RPi_AS3935 import RPi_AS3935
 import RPi.GPIO as GPIO
 import _thread
 from datetime import datetime
+from tzlocal import get_localzone
 
 import threading
 import socket
@@ -27,11 +28,14 @@ import sdnotify
 from signal import signal, SIGPIPE, SIG_DFL
 signal(SIGPIPE,SIG_DFL)
 
-script_version = "2.0.2"
+script_version = "2.0.3"
 script_name = 'ISP-lightning-mqtt-daemon.py'
 script_info = '{} v{}'.format(script_name, script_version)
 project_name = 'lightning-detector-MQTT2HA-Daemon'
 project_url = 'https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon'
+
+# we'll use this throughout
+local_tz = get_localzone()
 
 if False:
     # will be caught by python 2.7 to be illegal syntax
@@ -484,7 +488,7 @@ def send_settings(minStrikes, isIndoors, isDispLco, noiseFloor):
     topSettingsData = OrderedDict()
 
 
-    current_timestamp = datetime.now()
+    current_timestamp = datetime.now(local_tz)
     settingsData[LDS_TIMESTAMP] = current_timestamp.astimezone().replace(microsecond=0).isoformat()
 
     hardwareData = OrderedDict()
@@ -656,7 +660,7 @@ def binIndexFromDistance(distance):
     # -------------------------------------------------------------------------
 def ageDetections(accumulatedDetectionsList, period_in_minutes):
     filteredList = accumulatedDetectionsList.copy()
-    timeNow = datetime.now()
+    timeNow = datetime.now(local_tz)
     # our TUPLE is: (timestamp, energy, distance, strikeCount)
     #   chase from oldest to youngest...
     removed_count = 0
@@ -709,7 +713,7 @@ def getDictionaryForAccumulatorNamed(dictionaryName):
     # build a past dictionary and send it
     tmpRingsDict = OrderedDict()
 
-    current_timestamp = datetime.now()
+    current_timestamp = datetime.now(local_tz)
     tmpRingsDict[TIMESTAMP_KEY] = current_timestamp.astimezone().replace(microsecond=0).isoformat()
     if accumulatorLastStrike != '':
         tmpRingsDict[LAST_DETECT_KEY] = accumulatorLastStrike.astimezone().replace(microsecond=0).isoformat() 
@@ -849,7 +853,7 @@ def handle_interrupt(channel):
     global strikes_since_last_alert
     global detector
     sourceID = "<< INTR(" + str(channel) + ")"
-    current_timestamp = datetime.now()
+    current_timestamp = datetime.now(local_tz)
     if channel != TIMER_INTERRUPT:
         # ----------------------------------
         # have HARDWARE interrupt!
