@@ -140,7 +140,7 @@ This can be done by running it as a daemon via the Systemd service - on systemd 
 
 **NOTE:** Daemon mode must be enabled in the configuration file (default).
 
-By default the **isp-lightning.service** file indicates that the script should be run as user:group  **daemon:daemon**.  As this script requires access to i2c and gpio you'll want to add access to them for the daemon user as folows:
+By default the **isp-lightning.service** file indicates that the script should be run as user:group  **daemon:daemon**.  As this script requires access to i2c and gpio you'll want to add access to them for the daemon user as follows:
 
 
    ```shell   
