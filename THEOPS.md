@@ -18,14 +18,14 @@ Lastly, it sits, forever, waiting for interrupts from the detector. Here's a rou
 
 Let's start by understanding a tiny bit about our dectector. (*All the way to the left of our diagram.*)
 
--
+---
 ### The AS3935
 
 This sensor, in simple terms, listens for detections and then reports them as each is heard. It reports only a **relative strength** of the detection and **an estimate of distance** to the detection.
 
 **NOTE: there is NO directional information privided by the AS3935 sensor.**
 
--
+---
 ### How we get to "Rings"
 
 Since we don't have direction for a given detection, we only know that it happend say 12km away from us. This could be any direction from our position which is why we think in terms of rings. 
@@ -38,7 +38,7 @@ This detector reports distances as one of 16 possible values: overhead, >40km aw
 [Behavior]
 number_of_rings = { 3-7, Default: 5 }
 ```
--
+---
 ### A "Moving window"
 
 We also made a simplifying assumption that the most useful information to see would be, say, the most recent period of detections. So as each detection is "heard", we "remember" it. We also then "forget" any detections older than this period and we forward this new remaining set of detections via the MQTT broker to our card.  Here's the setting for this window size as seen in our **config.ini**:
@@ -48,7 +48,7 @@ We also made a simplifying assumption that the most useful information to see wo
 period_in_minutes = { 2-10, Default: 5 }
 ```
 
--
+---
 ### What about the whole storm?
 
 Yes we think the duration of the whole storm is also something useful to see on our card. The beginning of the storm is easy, this is the date/time of our first detection after we haven't seen a storm for a while.
@@ -62,7 +62,7 @@ end_storm_after_minutes = { 10-60, Default: 30 }
 
 This script then has a timer to locate the end of the storm which we start setting when we first have a full period of no detections. Then if a detection is heard we stop the timer and start waiting for nothing again. Eventually we'll reach the end of storm timeout and we'll report that the "storm ended" to our card.
 
--
+---
 ### Detection Accumulation
 
 Now let's look at what we do with each the detections: How do we determine storage based on user configured rings? How do we store a detection in a ring? and lastly how do we report this to our card?
@@ -159,12 +159,12 @@ Then for each ring we have:
 
 Notice that we are feeding value to the card so it doesn't have to calculate them?  Yes, this is by design simply to reduce the possibilty of the two this script and the card getting out of sync with each other.
 
--
+---
 ### Current ring-set and Past ring-set
 
 You just saw that that payload has a wrapping key called `crings`. This stands for **current ring set**. There is also the **past ring set** or `prings` reported at the and of each period.  This is simply a snapshot of the crings state at the end of the 5 minute period.  This is provided in case there is some interest in the ending display of the prior period of strikes for this storm. Just add a 2nd lightning detector card to your view and set the entity to the `prings` sensor and now you see both sets of rings with the new one only updating at the end of each period! These are each sent on their own MQTT Topic so let's go over what topics are maintained by this script.
 
--
+---
 ### Topics
 
 This script posts data at various times to the following topics:
@@ -203,7 +203,7 @@ For each detection you'd want to specify **a relative power value** to take adva
 
 Lastly, feed your "detections" to the interrupt handler as if it were test data and you are good to go.
 
--
+---
 
 *If you have any questions about what I've written here, file an issue and I'll respond with edits to this doc to attempt to make things more clear.*
 
@@ -215,7 +215,7 @@ Lead developer
 Iron Sheep Productions, LLC.
 ```
 
--
+---
 
 Last Updated: 02 Aug 2020, 02:02 MST
 
