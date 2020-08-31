@@ -28,7 +28,7 @@ import sdnotify
 from signal import signal, SIGPIPE, SIG_DFL
 signal(SIGPIPE,SIG_DFL)
 
-script_version = "2.0.3"
+script_version = "2.0.4"
 script_name = 'ISP-lightning-mqtt-daemon.py'
 script_info = '{} v{}'.format(script_name, script_version)
 project_name = 'lightning-detector-MQTT2HA-Daemon'
@@ -49,7 +49,7 @@ opt_verbose = False
 sd_notifier = sdnotify.SystemdNotifier()
 
 # Logging function
-def print_line(text, error=False, warning=False, info=False, verbose=False, debug=False, console=True, sd_notify=False):
+def print_line(text, error=False, warning=False, info=False, verbose=False, debug=False, console=True, sd_notify=False, log=False):
     timestamp = strftime('%Y-%m-%d %H:%M:%S', localtime())
     if console:
         if error:
@@ -62,6 +62,11 @@ def print_line(text, error=False, warning=False, info=False, verbose=False, debu
         elif debug:
             if opt_debug:
                 print(Fore.CYAN + '[{}] '.format(timestamp) + '- (DBG): ' + '{}'.format(text) + Style.RESET_ALL)
+            else:
+                print(Fore.YELLOW + '[{}] '.format(timestamp) + Fore.YELLOW  + '- ' + '{}'.format(text) + Style.RESET_ALL)
+        elif log:
+            if opt_debug:
+                print(Fore.MAGENTA + '[{}] '.format(timestamp) + '- (DBG): ' + '{}'.format(text) + Style.RESET_ALL)
         else:
             print(Fore.GREEN + '[{}] '.format(timestamp) + Style.RESET_ALL + '{}'.format(text) + Style.RESET_ALL)
 
@@ -77,12 +82,13 @@ def clean_identifier(name):
     clean = unidecode(clean)
     return clean
 
-# Argparse            
-parser = argparse.ArgumentParser(description=project_name, epilog='For further details see: ' + project_url)
+# Argparse
+parser = argparse.ArgumentParser(description=script_info, epilog='For further details see: ' + project_url)
 parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
 parser.add_argument("-d", "--debug", help="show debug output", action="store_true")
 parser.add_argument("-f", '--test_filename', help='load detections from test filename instead of using sensor', default='')
-parser.add_argument("-s", '--test_scale', help='load detections from test filename instead of using sensor', default='1')
+parser.add_argument("-t", '--test_scale', help='adjust test speed to run a ?x [Default 1x]', default='1')
+#parser.add_argument("-s", '--use_spi', help='our sensor is on SPI not i2c', action="store_true")
 parser.add_argument("-c", '--config_dir', help='set directory where config.ini is located', default=sys.path[0])
 parse_args = parser.parse_args()
 
@@ -90,6 +96,7 @@ config_dir = parse_args.config_dir
 test_filename = parse_args.test_filename
 opt_debug = parse_args.debug
 opt_verbose = parse_args.verbose
+opt_use_spi = False # parse_args.use_spi
 opt_testing = len(test_filename) > 0
 opt_scale = int(parse_args.test_scale)
 
@@ -100,21 +107,43 @@ if opt_debug:
     print_line('Debug enabled', debug=True)
 if opt_testing:
     print_line('Mode TESTING... @ {}x speed'.format(opt_scale))
+sensor_type = 'I2C'
+if opt_use_spi:
+    sensor_type = 'SPI'
+print_line('* Sensor on {} bus'.format(sensor_type))
 
+# -----------------------------------------------------------------------------
+#  MQTT handlers
+# -----------------------------------------------------------------------------
+
+# Eclipse Paho callbacks - http://www.eclipse.org/paho/clients/python/docs/#callbacks
+mqtt_client_connected = False
+print_line('* init mqtt_client_connected=[{}]'.format(mqtt_client_connected), debug=True)
 
 # Eclipse Paho callbacks - http://www.eclipse.org/paho/clients/python/docs/#callbacks
 def on_connect(client, userdata, flags, rc):
+    global mqtt_client_connected
     if rc == 0:
         print_line('MQTT connection established', console=True, sd_notify=True)
         print_line('')  # blank line?!
+        mqtt_client_connected = True
+        print_line('on_connect() mqtt_client_connected=[{}]'.format(mqtt_client_connected), debug=True)
     else:
         print_line('Connection error with result code {} - {}'.format(str(rc), mqtt.connack_string(rc)), error=True)
+        print_line('MQTT Connection error with result code {} - {}'.format(str(rc), mqtt.connack_string(rc)), error=True, sd_notify=True)
+        mqtt_client_connected = False   # technically NOT useful but readying possible new shape...
+        print_line('on_connect() mqtt_client_connected=[{}]'.format(mqtt_client_connected), debug=True)
         #kill main thread
         os._exit(1)
 
 def on_publish(client, userdata, mid):
     #print_line('Data successfully published.')
     pass
+
+def on_log(client, userdata, level, buf):
+    #print_line('* Data successfully published.')
+    print_line("log: {}".format(buf), debug=True, log=True)
+
 
 # Load configuration file
 config = ConfigParser(delimiters=('=', ), inline_comment_prefixes=('#'))
@@ -144,7 +173,7 @@ max_period_in_minutes = 10
 default_period_in_minutes = 5   # [2-10]
 period_in_minutes = int(config['Behavior'].get('period_in_minutes', default_period_in_minutes))
 
-min_number_of_rings = 3 
+min_number_of_rings = 3
 max_number_of_rings = 7
 default_number_of_rings = 5 # [3-7]
 number_of_rings = int(config['Behavior'].get('number_of_rings', default_number_of_rings))
@@ -191,19 +220,19 @@ detector_min_strikes = int(config['Sensor'].get('detector_min_strikes', default_
 #
 if (period_in_minutes < min_period_in_minutes) or (period_in_minutes > max_period_in_minutes):
     print_line('ERROR: Invalid "period_in_minutes" found in configuration file: "config.ini"! Must be [{}-{}] Fix and try again... Aborting'.format(min_period_in_minutes, max_period_in_minutes), error=True, sd_notify=True)
-    sys.exit(1)   
+    sys.exit(1)
 
 if (end_storm_after_minutes < min_end_storm_after_minutes) or (end_storm_after_minutes > max_end_storm_after_minutes):
     print_line('ERROR: Invalid "end_storm_after_minutes" found in configuration file: "config.ini"! Must be [{}-{}] Fix and try again... Aborting'.format(min_end_storm_after_minutes, max_end_storm_after_minutes), error=True, sd_notify=True)
-    sys.exit(1)   
+    sys.exit(1)
 
 if (number_of_rings < min_number_of_rings) or (number_of_rings > max_number_of_rings):
     print_line('ERROR: Invalid "number_of_rings" found in configuration file: "config.ini"! Must be [{}-{}] Fix and try again... Aborting'.format(min_number_of_rings, max_number_of_rings), error=True, sd_notify=True)
-    sys.exit(1)   
+    sys.exit(1)
 
 if (distance_as != val_distance_as_km) and (distance_as != val_distance_as_mi):
     print_line('ERROR: Invalid "distance_as" found in configuration file: "config.ini"! Must be ["{}" or "{}"] Fix and try again... Aborting'.format(val_distance_as_km, val_distance_as_mi), error=True, sd_notify=True)
-    sys.exit(1)   
+    sys.exit(1)
 
 ### Ensure required values within sections of our config are present
 if not config['MQTT']:
@@ -233,7 +262,7 @@ def startAliveTimer():
     global aliveTimer
     global aliveTimerRunningStatus
     stopAliveTimer()
-    aliveTimer = threading.Timer(ALIVE_TIMOUT_IN_SECONDS, aliveTimeoutHandler) 
+    aliveTimer = threading.Timer(ALIVE_TIMOUT_IN_SECONDS, aliveTimeoutHandler)
     aliveTimer.start()
     aliveTimerRunningStatus = True
     print_line('- started MQTT timer - every {} seconds'.format(ALIVE_TIMOUT_IN_SECONDS), debug=True)
@@ -250,7 +279,7 @@ def isAliveTimerRunning():
     return aliveTimerRunningStatus
 
 # our ALIVE TIMER
-aliveTimer = threading.Timer(ALIVE_TIMOUT_IN_SECONDS, aliveTimeoutHandler) 
+aliveTimer = threading.Timer(ALIVE_TIMOUT_IN_SECONDS, aliveTimeoutHandler)
 # our BOOL tracking state of ALIVE TIMER
 aliveTimerRunningStatus = False
 
@@ -268,6 +297,7 @@ print_line('Connecting to MQTT broker ...', verbose=True)
 mqtt_client = mqtt.Client()
 mqtt_client.on_connect = on_connect
 mqtt_client.on_publish = on_publish
+mqtt_client.on_log = on_log
 
 mqtt_client.will_set(lwt_topic, payload=lwt_offline_val, retain=True)
 
@@ -297,13 +327,14 @@ except:
 else:
     mqtt_client.publish(lwt_topic, payload=lwt_online_val, retain=False)
     mqtt_client.loop_start()
-    sleep(1.0) # some slack to establish the connection
+
+    while mqtt_client_connected == False: #wait in loop
+        print_line('* Wait on mqtt_client_connected=[{}]'.format(mqtt_client_connected), debug=True)
+        sleep(1.0) # some slack to establish the connection
+
     startAliveTimer()
 
 sd_notifier.notify('READY=1')
-
-
-
 
 # -----------------------------------------------------------------------------
 #  Perform our MQTT Discovery Announcement...
@@ -415,7 +446,7 @@ def startPeriodTimer():
     global endPeriodTimer
     global periodTimeRunningStatus
     stopPeriodTimer()
-    endPeriodTimer = threading.Timer(period_in_minutes * 60.0, periodTimeoutHandler) 
+    endPeriodTimer = threading.Timer(period_in_minutes * 60.0, periodTimeoutHandler)
     endPeriodTimer.start()
     periodTimeRunningStatus = True
     print_line('- started PERIOD timer - every {} seconds'.format(period_in_minutes * 60.0), debug=True)
@@ -434,7 +465,7 @@ def isPeriodTimerRunning():
 
 
 # our TIMER
-endPeriodTimer = threading.Timer(period_in_minutes * 60.0, periodTimeoutHandler) 
+endPeriodTimer = threading.Timer(period_in_minutes * 60.0, periodTimeoutHandler)
 # our BOOL tracking state of TIMER
 periodTimeRunningStatus = False
 
@@ -497,7 +528,7 @@ def send_settings(minStrikes, isIndoors, isDispLco, noiseFloor):
     hardwareData[LDS_LCO_ON_INT] = isDispLco
     hardwareData[LDS_NOISE_FLOOR] = noiseFloor
 
-    settingsData[LDS_CAT_HARDWARE] = hardwareData  
+    settingsData[LDS_CAT_HARDWARE] = hardwareData
 
     scriptData = OrderedDict()
     scriptData[LDS_PERIOD_IN_MINUTES] = period_in_minutes
@@ -656,7 +687,7 @@ def binIndexFromDistance(distance):
     #   a moving window of strikes and push this moving window into the bins
     #   only when we need to report the bin-set
     #
-    # 
+    #
     # -------------------------------------------------------------------------
 def ageDetections(accumulatedDetectionsList, period_in_minutes):
     filteredList = accumulatedDetectionsList.copy()
@@ -678,7 +709,7 @@ def ageDetections(accumulatedDetectionsList, period_in_minutes):
 
     orig_count = len(accumulatedDetectionsList)
     new_count = len(filteredList)
-    
+
     print_line('adjusted detection set: enter with {} , leave with {}, removed {}'.format(orig_count, new_count, removed_count), debug=True)
     return filteredList
 
@@ -716,18 +747,18 @@ def getDictionaryForAccumulatorNamed(dictionaryName):
     current_timestamp = datetime.now(local_tz)
     tmpRingsDict[TIMESTAMP_KEY] = current_timestamp.astimezone().replace(microsecond=0).isoformat()
     if accumulatorLastStrike != '':
-        tmpRingsDict[LAST_DETECT_KEY] = accumulatorLastStrike.astimezone().replace(microsecond=0).isoformat() 
+        tmpRingsDict[LAST_DETECT_KEY] = accumulatorLastStrike.astimezone().replace(microsecond=0).isoformat()
     if accumulatorFirstStrike != '':
-        tmpRingsDict[FIRST_DETECT_KEY] = accumulatorFirstStrike.astimezone().replace(microsecond=0).isoformat() 
+        tmpRingsDict[FIRST_DETECT_KEY] = accumulatorFirstStrike.astimezone().replace(microsecond=0).isoformat()
     if accumulatorStormLastStrike != '':
-        tmpRingsDict[STORM_LAST_DETECT_KEY] = accumulatorStormLastStrike.astimezone().replace(microsecond=0).isoformat() 
+        tmpRingsDict[STORM_LAST_DETECT_KEY] = accumulatorStormLastStrike.astimezone().replace(microsecond=0).isoformat()
     if accumulatorStormFirstStrike != '':
-        tmpRingsDict[STORM_FIRST_DETECT_KEY] = accumulatorStormFirstStrike.astimezone().replace(microsecond=0).isoformat() 
+        tmpRingsDict[STORM_FIRST_DETECT_KEY] = accumulatorStormFirstStrike.astimezone().replace(microsecond=0).isoformat()
     tmpRingsDict[STORM_END_MINUTES_KEY] = end_storm_after_minutes
     tmpRingsDict[PERIOD_IN_MINUTES_KEY] = period_in_minutes
     tmpRingsDict[UNITS_KEY] = distance_as
     tmpRingsDict[OUT_OF_RANGE_KEY] = accumulatorOutOfRangeCount
-    tmpRingsDict[RING_COUNT_KEY] = number_of_rings    
+    tmpRingsDict[RING_COUNT_KEY] = number_of_rings
     tmpRingsDict[RING_WIDTH_KEY] = round((40 - 5) / number_of_rings, 1)
 
     if distance_as == val_distance_as_km:
@@ -787,7 +818,7 @@ def loadDetectionsIntoBins():
         # place earliest detection here
         if accumulatorFirstStrike == '':
             accumulatorFirstStrike = timestamp
-        
+
         # place latest detection here
         accumulatorLastStrike = timestamp
 
@@ -803,11 +834,11 @@ def loadDetectionsIntoBins():
             else:
                 currCount = 0
             if TOTAL_ENERGY_KEY in desiredBin:
-                currTotalEnergy = desiredBin[TOTAL_ENERGY_KEY] 
+                currTotalEnergy = desiredBin[TOTAL_ENERGY_KEY]
             else:
                 currTotalEnergy = 0
             if ACCUM_COUNT_KEY in desiredBin:
-                currAccumCount = desiredBin[ACCUM_COUNT_KEY] 
+                currAccumCount = desiredBin[ACCUM_COUNT_KEY]
             else:
                 currAccumCount = 0
 
@@ -815,17 +846,17 @@ def loadDetectionsIntoBins():
             currAccumCount += 1
             currCount += strikeCount
 
-            # real values for consumer  
+            # real values for consumer
             desiredBin[STRIKE_COUNT_KEY] = currCount
             desiredBin[ENERGY_KEY] = int(currTotalEnergy / currAccumCount)
             # internal values so we can accumulate correctly
             desiredBin[TOTAL_ENERGY_KEY] = currTotalEnergy
-            desiredBin[ACCUM_COUNT_KEY] = currAccumCount   
+            desiredBin[ACCUM_COUNT_KEY] = currAccumCount
 
 def publishRingData(ringsData, topic):
     print_line('Publishing to MQTT topic "{}, Data:{}"'.format(topic, json.dumps(ringsData)))
     mqtt_client.publish('{}'.format(topic), json.dumps(ringsData), 1, retain=False)
-    sleep(0.5) # some slack for the publish roundtrip and callback function  
+    sleep(0.5) # some slack for the publish roundtrip and callback function
 
 def report_past_accumulator(topic):
     # build a past dictionary and send it
@@ -864,7 +895,7 @@ def handle_interrupt(channel):
             reason = detector.get_interrupt()
         else:
             reason = 0x08
-        
+
         if reason == 0x01:
             print_line(sourceID + " >> Noise level too high - adjusting")
             detector.raise_noise_floor()
@@ -926,7 +957,7 @@ def handle_interrupt(channel):
         report_past_accumulator(prings_topic)
         removeOldDetections()
         report_current_accumulator(crings_topic)
-        resetStormTracking()    # kill awareness of any storm 
+        resetStormTracking()    # kill awareness of any storm
         stopPeriodTimer()   #  kill our timer until our next detection
         #  reset our indicators
         strikes_since_last_alert = 0
