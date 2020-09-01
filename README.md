@@ -21,6 +21,7 @@ This script can be configured to be run in **daemon mode** continously in the ba
 ## I2C or SPI
 
 **NOTE:** if you are using an SPI version of the AS3935 sensor board, please refer to [README-SPI.md](README-SPI.md) instead of this page!
+
 ---
 
 Hey, I will always appreciate your helping me out for a couple of :coffee:'s or :pizza: slices!
@@ -28,6 +29,7 @@ Hey, I will always appreciate your helping me out for a couple of :coffee:'s or 
 [![coffee](https://www.buymeacoffee.com/assets/img/custom_images/black_img.png)](https://www.buymeacoffee.com/ironsheep)
 
 ## Features
+
 * Tested on Raspberry Pi's 3 & 4 with Buster - but really should work on any.
 * Tested with Home Assistant v0.111.0
 * Tested with Mosquitto broker v5.1
@@ -39,6 +41,7 @@ Hey, I will always appreciate your helping me out for a couple of :coffee:'s or 
 * Linux daemon / systemd service, sd\_notify messages generated
 
 ## Lightning Detector Device
+
 The AS3935 Lightning Detector monitored by this script is reported as:
 
 | Name            | Description |
@@ -69,6 +72,7 @@ This Lightning Detector as a sensor provides the following readings:
 ## Prerequisites
 
 ### Detector Board
+
 You'll need an inexpensive lightning detector sensor (based on the AS3925 integrated circuit.)  I picked up my [AS3925 integrated circuit on a small circuit board from Sparkfun](https://www.sparkfun.com/products/15441), but a [similar board also avail. from Amazon](https://www.amazon.com/Gravity-Lightning-Intensity-Thunderstorm-Photography/dp/B07N2M3L51?ref_=ast_sto_dp)
 
 **A NOTE of Caution!** Please watch your prices... you should be able to get one for under $30 USD*. People are trying to sell them at much higher prices. Shop around for your best price.
@@ -83,6 +87,7 @@ You'll need to know the hostname (or IP address) of the machine where the MQTT b
 *You will add this information to the config.ini for this script, as described below.*
 
 ## Connecting the AS3935 to your Raspberry Pi
+
 You'll need the AS3935 Lightning sensor to be connected (via I2C for now) to your RPi.  Here's the pinout I use:
 
 | AS3935 Pin      | Module Pin | Raspberry Pi Pin |
@@ -108,6 +113,7 @@ sudo git clone https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon /o
 cd /opt/ISP-lightning-mqtt-daemon
 sudo pip3 install -r requirements.txt
 ```
+
 ## Configuration
 
 To match personal needs, all operational details can be configured by modifying entries within the file [`config.ini`](config.ini.dist).
@@ -219,19 +225,19 @@ Lastly, there are two additional topics published which are used to drive our ne
 
 
 ## Lovelace Card for Home Assistant
+
 Want to go further?  There is a [Lovelace Lightning Detector Card](https://github.com/ironsheep/lovelace-lightning-detector-card) built specifically for visualizing this lightning data.
 
-
 ## Credits
+
 Thank you to "Hexalyse" for providing the starting logic for this effort. His project which i had tweeting (yes, in french) locally here in Colorado when i was first bringing up my hardware is [LightningTweeter](https://github.com/Hexalyse/LightningTweeter)
 
 Thank you to also Thomas Dietrich for providing a wonderful pattern for this project. His project, which I use and heartily recommend, is [miflora-mqtt-deamon](https://github.com/ThomDietrich/miflora-mqtt-daemon)
 
-
-
 ## Disclaimer and Legal
 
 ----
+
 > *Raspberry Pi* is registered trademark of *Raspberry Pi (Trading) Ltd.*
 >
 > This project is a community project not for commercial use.
