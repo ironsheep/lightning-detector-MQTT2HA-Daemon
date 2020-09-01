@@ -892,8 +892,8 @@ if opt_testing == False and sensor_using_spi:
     print_line('SPI configuration bus={} - device={}'.format(spi_bus, spi_device), verbose=True)
 
     detector = AS3935_SPI(interrupt_pin, spi_device, spi_bus)
-    detector.max_speed_hz(1750000)  # 1,750,000 Hz (1.75 MHz)
-    detector.mode(0b00)     # [CPOL|CPHA], min: 0b00 = 0, max: 0b11 = 3
+    detector.max_speed_hz(1250000)  # 1,250,000 Hz (1.25 MHz)
+    detector.mode(0b01)     # [CPOL|CPHA], min: 0b00 = 0, max: 0b11 = 3
 
 # -----------------------------------------------------------------------------
 #  Ready our AS3935 connected via I2c for use...

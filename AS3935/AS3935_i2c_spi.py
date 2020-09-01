@@ -561,8 +561,13 @@ class AS3935_SPI:
         self.bus = bus
         self.irq = irq
         self.pi = pigpio.pi()
+        self.speedInHz = 1000000 # default
+        self.spi_mode = 0b00    # default
+        self.bitsPerWord = 8
+        self.holdCsInMicroSec = 10
         self.spi_device = spidev.SpiDev()
         self.spi_device.open(bus, device)
+        self.spi_device.lsbfirst = False
 
     def close():
         """
@@ -578,6 +583,7 @@ class AS3935_SPI:
 
         :param speedInHz: (int) desired SCLK freq. in Hz
         """
+        self.speedInHz = speedInHz
         self.spi_device.max_speed_hz = speedInHz
 
     def mode(self, modeBits):
@@ -586,6 +592,7 @@ class AS3935_SPI:
 
         :param modeBits: (int) SPI mode as two bit pattern of clock polarity and phase [CPOL|CPHA], min: 0b00 = 0, max: 0b11 = 3
         """
+        self.spi_mode = modeBits
         self.spi_device.mode = modeBits
 
     # ------ CROSS FUNCTIONS ------ #
@@ -602,11 +609,14 @@ class AS3935_SPI:
         """
         if not 0 <= address <= 63:
             raise ValueError("The address must be between 0x00 and 0x3F")
-        read_cmd = [ address & 0x3f | self.BITS_A7A6_READ ]
-        bytesRead = self.spi_device.xfer3(read_cmd, count)
-        if not len(bytesRead) == count:
-            raise AssertionError('Failed to read {} byte(s) from SPI device!'.format(count))
-        return bytesRead
+        read_cmd = [ address & 0x3f | self.BITS_A7A6_READ ] + [ 0x0 ] * count
+        bytesRead = self.spi_device.xfer(read_cmd)
+        if not len(bytesRead) == count + 1:
+            raise AssertionError('Failed to read {} byte(s) from SPI device (got {})!'.format(count, len(bytesRead)))
+        bytesRequested = bytesRead[1:]
+        if not len(bytesRequested) == count:
+            raise AssertionError('Failed to read {} byte(s) from SPI device (got {})!'.format(count, len(bytesRequested)))
+        return bytesRequested
 
     def read_byte(self, address):
         """
