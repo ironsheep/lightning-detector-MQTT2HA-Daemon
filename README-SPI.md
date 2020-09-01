@@ -25,6 +25,7 @@ Hey, I will always appreciate your helping me out for a couple of :coffee:'s or 
 [![coffee](https://www.buymeacoffee.com/assets/img/custom_images/black_img.png)](https://www.buymeacoffee.com/ironsheep)
 
 ## Features
+
 * Tested on Raspberry Pi's 3 & 4 with Buster - but really should work on any.
 * Tested with Home Assistant v0.111.0
 * Tested with Mosquitto broker v5.1
@@ -36,6 +37,7 @@ Hey, I will always appreciate your helping me out for a couple of :coffee:'s or 
 * Linux daemon / systemd service, sd\_notify messages generated
 
 ## Lightning Detector Device
+
 The AS3935 Lightning Detector monitored by this script is reported as:
 
 | Name            | Description |
@@ -66,6 +68,7 @@ This Lightning Detector as a sensor provides the following readings:
 ## Prerequisites
 
 ### Detector Board
+
 You'll need an inexpensive lightning detector sensor (based on the AS3925 integrated circuit.)  I picked up my [AS3925 integrated circuit on a small circuit board from Sparkfun](https://www.sparkfun.com/products/15441), but a [similar board also avail. from Amazon](https://www.amazon.com/Gravity-Lightning-Intensity-Thunderstorm-Photography/dp/B07N2M3L51?ref_=ast_sto_dp)
 
 **A NOTE of Caution!** Please watch your prices... you should be able to get one for under $30 USD*. People are trying to sell them at much higher prices. Shop around for your best price.
@@ -80,17 +83,22 @@ You'll need to know the hostname (or IP address) of the machine where the MQTT b
 *You will add this information to the config.ini for this script, as described below.*
 
 ## Connecting the AS3935 to your Raspberry Pi
-You'll need the AS3935 Lightning sensor to be connected (via I2C for now) to your RPi.  Here's the pinout I use:
 
-| AS3935 Pin      | Module Pin | Raspberry Pi Pin |
-|-----------------|------------|------------------|
-| 4 (GND)         | GND        | 9 (Ground) |
-| 5 (VDD)         | VCC        | 1 (3.3v) |
-| 10 (IRQ)        | IRQ        | 11 (GPIO 17) |
-| 11 (I2CL)       | SCL        | 5 (SCL) |
-| 13 (I2CD)       | SDA / MOSI | 3 (SDA) |
+You'll need the AS3935 Lightning sensor to be connected via SPI to your RPi.  Here's the pinout I use: (chose pins close together to make easy to wire up)
 
-(You can use a different GPIO pin for the IRQ, but remember to change your config.ini:**intr_pin = 17** value to the GPIO # you choose.)
+| AS3935 Pin      | Module Pin  | Raspberry Pi Pin |
+|-----------------|-------------|------------------|
+| 4 (GND)         | GND         | 25 (Ground)   |
+| 5 (VDD)         | VCC         | 17 (3.3v)     |
+| 8 (CS)          | /CS         | 24 (CE0)     |
+| 10 (IRQ)        | IRQ         | 22 (GPIO 25) |
+| 11 (SCLK)       | SCLK        | 23 (SCLK)    |
+| 12 (MISO)       | MISO        | 21 (MISO)    |
+| 13 (MOSI)       | MOSI        | 19 (MOSI)    |
+
+Make sure to change your config.ini:**sensor_attached = SPI**
+
+(You can use a different GPIO pin for the IRQ, but remember to change your config.ini:**intr_pin = 25** value to the GPIO # you choose.)
 
 ## Installation
 
@@ -105,6 +113,7 @@ sudo git clone https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon /o
 cd /opt/ISP-lightning-mqtt-daemon
 sudo pip3 install -r requirements.txt
 ```
+
 ## Configuration
 
 To match personal needs, all operational details can be configured by modifying entries within the file [`config.ini`](config.ini.dist).
@@ -139,19 +148,19 @@ This can be done by running it as a daemon via the Systemd service - on systemd 
 
 **NOTE:** Daemon mode must be enabled in the configuration file (default).
 
-By default the **isp-lightning.service** file indicates that the script should be run as user:group  **daemon:daemon**.  As this script requires access to i2c and gpio you'll want to add access to them for the daemon user as follows:
+By default the **isp-lightning.service** file indicates that the script should be run as user:group  **daemon:daemon**.  As this script requires access to SPI and gpio you'll want to add access to them for the daemon user as follows:
 
    ```shell
    # list current groups
    groups daemon
    $ daemon : daemon
 
-   # add i2c, gpio if not present
-   sudo usermod daemon -a -G i2c,gpio
+   # add SPI, gpio if not present
+   sudo usermod daemon -a -G spi,gpio
 
    # list current groups
    groups daemon
-   $ daemon : daemon i2c gpio
+   $ daemon : daemon spi gpio
    #                 ^^^^^^^^ now they are present
    ```
 
@@ -212,14 +221,17 @@ Additionally, the detector settings along with script settings are written to: "
 Lastly, there are two additional topics published which are used to drive our new **Lovelace card**. These are:
 
 - "`{base_topic}/{sensorName}/crings`" - which posts the live status of current period, updated at each new strike
+
 - "`{base_topic}/{sensorName}/prings`" - which posts the status of the preceeding full period, updated at the end of a period
 
 
 ## Lovelace Card for Home Assistant
+
 Want to go further?  There is a [Lovelace Lightning Detector Card](https://github.com/ironsheep/lovelace-lightning-detector-card) built specifically for visualizing this lightning data.
 
 
 ## Credits
+
 Thank you to "Hexalyse" for providing the starting logic for this effort. His project which i had tweeting (yes, in french) locally here in Colorado when i was first bringing up my hardware is [LightningTweeter](https://github.com/Hexalyse/LightningTweeter)
 
 Thank you to also Thomas Dietrich for providing a wonderful pattern for this project. His project, which I use and heartily recommend, is [miflora-mqtt-deamon](https://github.com/ThomDietrich/miflora-mqtt-daemon)

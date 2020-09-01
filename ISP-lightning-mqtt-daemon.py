@@ -26,9 +26,10 @@ from unidecode import unidecode
 import paho.mqtt.client as mqtt
 import sdnotify
 from signal import signal, SIGPIPE, SIG_DFL
+import spidev
 signal(SIGPIPE,SIG_DFL)
 
-script_version = "2.0.4"
+script_version = "2.1.0"
 script_name = 'ISP-lightning-mqtt-daemon.py'
 script_info = '{} v{}'.format(script_name, script_version)
 project_name = 'lightning-detector-MQTT2HA-Daemon'
@@ -88,7 +89,6 @@ parser.add_argument("-v", "--verbose", help="increase output verbosity", action=
 parser.add_argument("-d", "--debug", help="show debug output", action="store_true")
 parser.add_argument("-f", '--test_filename', help='load detections from test filename instead of using sensor', default='')
 parser.add_argument("-t", '--test_scale', help='adjust test speed to run a ?x [Default 1x]', default='1')
-#parser.add_argument("-s", '--use_spi', help='our sensor is on SPI not i2c', action="store_true")
 parser.add_argument("-c", '--config_dir', help='set directory where config.ini is located', default=sys.path[0])
 parse_args = parser.parse_args()
 
@@ -96,7 +96,6 @@ config_dir = parse_args.config_dir
 test_filename = parse_args.test_filename
 opt_debug = parse_args.debug
 opt_verbose = parse_args.verbose
-opt_use_spi = False # parse_args.use_spi
 opt_testing = len(test_filename) > 0
 opt_scale = int(parse_args.test_scale)
 
@@ -107,10 +106,6 @@ if opt_debug:
     print_line('Debug enabled', debug=True)
 if opt_testing:
     print_line('Mode TESTING... @ {}x speed'.format(opt_scale))
-sensor_type = 'I2C'
-if opt_use_spi:
-    sensor_type = 'SPI'
-print_line('* Sensor on {} bus'.format(sensor_type))
 
 # -----------------------------------------------------------------------------
 #  MQTT handlers
@@ -193,14 +188,43 @@ distance_as = config['Behavior'].get('distance_as', default_distance_as)
 # GPIO pin used for interrupts
 #  I2c = GPIO2/pin3/SDA, GPIO3/pin5/SCL
 #  SPI = GPI10/pin19/MOSI, GPIO9/pin21/MISO, GPIO11/pin23/SCLK, GPIO8/pin24/CE0, GPIO7/pin26/CE1
+val_interface_type_i2c = 'I2C'
+val_interface_type_spi = 'SPI'
+default_interface_type = val_interface_type_i2c
+interface_type = config['Sensor'].get('sensor_attached', default_interface_type).upper()
+
 default_intr_pin = 17   # any GPIO pin not used for comms with chip
 intr_pin = int(config['Sensor'].get('intr_pin', default_intr_pin))
 
-default_i2c_bus = 1
-default_i2c_address = 0x03
+default_i2c_bus = '1'
+default_i2c_address = '0x03'
 
-i2c_bus = int(config['Sensor'].get('i2c_bus', default_i2c_bus))
-i2c_address = int(config['Sensor'].get('i2c_address', default_i2c_address))
+config_i2c_bus = config['Sensor'].get('i2c_bus', default_i2c_bus)
+if config_i2c_bus.startswith('0x'):
+    i2c_bus = int(config_i2c_bus,16)
+else:
+    i2c_bus = int(config_i2c_bus)
+
+config_i2c_address = config['Sensor'].get('i2c_address', default_i2c_address)
+if config_i2c_address.startswith('0x'):
+    i2c_address = int(config_i2c_address,16)
+else:
+    i2c_address = int(config_i2c_address)
+
+default_spi_bus = '0'
+default_spi_device = '0'
+
+config_spi_bus = config['Sensor'].get('spi_bus', default_spi_bus)
+if config_spi_bus.startswith('0x'):
+    spi_bus = int(config_spi_bus,16)
+else:
+    spi_bus = int(config_spi_bus)
+
+config_spi_device = config['Sensor'].get('spi_device', default_spi_device)
+if config_spi_device.startswith('0x'):
+    spi_device = int(config_spi_device,16)
+else:
+    spi_device = int(config_spi_device)
 
 default_detector_afr_gain_indoor = True
 detector_afr_gain_indoor = config['Sensor'].get('detector_afr_gain_indoor', default_detector_afr_gain_indoor)
@@ -213,11 +237,12 @@ detector_noise_floor = int(config['Sensor'].get('detector_noise_floor', default_
 default_detector_min_strikes = 5
 detector_min_strikes = int(config['Sensor'].get('detector_min_strikes', default_detector_min_strikes))
 
-#  FIXME: UNONE - let's add value VALIDATION!!!
-
 # Check configuration
 #
-#
+if (interface_type != val_interface_type_i2c) and (interface_type != val_interface_type_spi):
+    print_line('ERROR: Invalid "sensor_attached" found in configuration file: "config.ini"! Must be [{} or {}] Fix and try again... Aborting'.format(val_interface_type_i2c, val_interface_type_spi), error=True, sd_notify=True)
+    sys.exit(1)
+
 if (period_in_minutes < min_period_in_minutes) or (period_in_minutes > max_period_in_minutes):
     print_line('ERROR: Invalid "period_in_minutes" found in configuration file: "config.ini"! Must be [{}-{}] Fix and try again... Aborting'.format(min_period_in_minutes, max_period_in_minutes), error=True, sd_notify=True)
     sys.exit(1)
@@ -241,7 +266,11 @@ if not config['MQTT']:
 
 
 print_line('Configuration accepted', console=False, sd_notify=True)
+print_line('* Sensor on {} bus'.format(interface_type))
 
+sensor_using_spi = False
+if interface_type == 'SPI':
+    sensor_using_spi = True
 
 # -----------------------------------------------------------------------------
 #  timer and timer funcs for ALIVE MQTT Notices handling
@@ -469,36 +498,6 @@ endPeriodTimer = threading.Timer(period_in_minutes * 60.0, periodTimeoutHandler)
 # our BOOL tracking state of TIMER
 periodTimeRunningStatus = False
 
-
-# -----------------------------------------------------------------------------
-#  Ready our AS3935 connected via I2c for use...
-# -----------------------------------------------------------------------------
-
-# Initialize GPIO
-GPIO.setmode(GPIO.BCM)
-
-# pin used for interrupts
-
-# Rev. 1 Raspberry Pis should leave bus set at 0, while rev. 2 Pis should set
-# bus equal to 1. The address should be changed to match the address of the
-# detector IC.
-print_line('I2C configuration addr={} - bus={}'.format(i2c_address, i2c_bus), verbose=True)
-
-detector = RPi_AS3935.RPi_AS3935(i2c_address, i2c_bus)
-# Indoors = more sensitive (can miss very strong lightnings)
-# Outdoors = less sensitive (can miss far away lightnings)
-detector.set_indoors(detector_afr_gain_indoor)
-detector.set_noise_floor(default_detector_noise_floor)
-# Change this value to the tuning value for your detector
-detector.calibrate(tun_cap=0x01)
-# Prevent single isolated strikes from being logged => interrupts begin after 5 strikes, then are fired normally
-detector.set_min_strikes(detector_min_strikes)
-
-first_alert = datetime.min
-last_alert = datetime.min
-strikes_since_last_alert = 0
-
-
 # -----------------------------------------------------------------------------
 #  MQTT Transmit Helper Routines
 # -----------------------------------------------------------------------------
@@ -517,7 +516,6 @@ LDS_DISTANCE_UNITS = "distance_units"
 
 def send_settings(minStrikes, isIndoors, isDispLco, noiseFloor):
     topSettingsData = OrderedDict()
-
 
     current_timestamp = datetime.now(local_tz)
     settingsData[LDS_TIMESTAMP] = current_timestamp.astimezone().replace(microsecond=0).isoformat()
@@ -874,6 +872,47 @@ def report_current_accumulator(topic):
 
 # -----------------------------------------------------------------------------
 
+
+# -----------------------------------------------------------------------------
+#  Ready our AS3935 connected via SPI for use...
+# -----------------------------------------------------------------------------
+if sensor_using_spi:
+    print_line('SPI configuration bus={} - device={}'.format(spi_bus, spi_device), verbose=True)
+
+# -----------------------------------------------------------------------------
+#  Ready our AS3935 connected via I2c for use...
+# -----------------------------------------------------------------------------
+
+
+
+# pin used for interrupts
+
+if sensor_using_spi == False:
+    # Rev. 1 Raspberry Pis should leave bus set at 0, while rev. 2 Pis should set
+    # bus equal to 1. The address should be changed to match the address of the
+    # detector IC.
+    print_line('I2C configuration bus={} - addr={}'.format(i2c_bus, i2c_address), verbose=True)
+
+    detector = RPi_AS3935.RPi_AS3935(i2c_address, i2c_bus)
+
+# -----------------------------------------------------------------------------
+#  Now just talk with our AS3935 connected via I2c or SPI
+# -----------------------------------------------------------------------------
+
+# Indoors = more sensitive (can miss very strong lightnings)
+# Outdoors = less sensitive (can miss far away lightnings)
+detector.set_indoors(detector_afr_gain_indoor)
+detector.set_noise_floor(default_detector_noise_floor)
+# Change this value to the tuning value for your detector
+detector.calibrate(tun_cap=0x01)
+# Prevent single isolated strikes from being logged => interrupts begin after 5 strikes, then are fired normally
+detector.set_min_strikes(detector_min_strikes)
+
+
+first_alert = datetime.min
+last_alert = datetime.min
+strikes_since_last_alert = 0
+
 synth_energy = 0
 synth_distance = 63
 
@@ -967,24 +1006,38 @@ def handle_interrupt(channel):
 resetAccumulatorToEmpty()
 calculate_ring_widths()
 
-if opt_testing == False:
-    # Use a software Pull-Down on interrupt pin
-    pin = int(intr_pin)
-    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-    detector.set_mask_disturber(False)
-
 # post setup data, once per run
 settingsData = OrderedDict()
 min_strikes = detector.get_min_strikes()
 indoors = detector.get_indoors()
 disp_lco = detector.get_disp_lco()
 noise_floor = detector.get_noise_floor()
+
 _thread.start_new_thread(send_settings, (min_strikes, indoors, disp_lco, noise_floor))
 
+
+# -----------------------------------------------------------------------------
+#  Configure our interrupt handling
+# -----------------------------------------------------------------------------
+
+# if we are getting data from our live sensor then configure our interrupt pin
+#  and attach our interrupt handler to it
 if opt_testing == False:
+    # Initialize GPIO
+    GPIO.setmode(GPIO.BCM)
+
+    # Use a software Pull-Down on interrupt pin
+    pin = int(intr_pin)
+    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+    detector.set_mask_disturber(False)
+
     # now configure for run in main loop
     GPIO.add_event_detect(pin, GPIO.RISING, callback=handle_interrupt)
 
+
+# -----------------------------------------------------------------------------
+#  Run our detection loop
+# -----------------------------------------------------------------------------
 print_line("Waiting for lightning - or at least something that looks like it", verbose=True)
 
 if opt_testing == False:

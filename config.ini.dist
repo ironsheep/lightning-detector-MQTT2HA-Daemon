@@ -72,15 +72,21 @@
 [Sensor]
 
 # decribe how your sensor is hooked up to your RPi
-#  NOTE: only i2c supported for now
+#  use values 'I2C' or 'SPI' - default is 'I2C'
+#sensor_attached = I2C
 
 # GPIO pin used for interrupts
 #intr_pin = 17
 
+# The SPI bus and device numbers come from the device file being used.
+#   e.g., /dev/spidev0.0  would be bus=0, device=0
+# The defaults are 0 and 0 (SPI0 which appears at the GPIO 40pin header)
+#spi_bus = 0
+#spi_device = 0
+
 # Rev. 1 Raspberry Pis should leave bus set at 0, while rev. 2 Pis should set
 # bus equal to 1. The address should be changed to match the address of the
 # sensor.
-
 #i2c_bus = 1
 #i2c_address = 0x03
 
