@@ -893,7 +893,7 @@ if opt_testing == False and sensor_using_spi:
 
     detector = AS3935_SPI(interrupt_pin, spi_device, spi_bus)
     detector.max_speed_hz(1250000)  # 1,250,000 Hz (1.25 MHz)
-    detector.mode(0b01)     # [CPOL|CPHA], min: 0b00 = 0, max: 0b11 = 3
+    detector.mode(0b01)     # [CPOL=0|CPHA=1] per AS3935 doc.
 
 # -----------------------------------------------------------------------------
 #  Ready our AS3935 connected via I2c for use...
@@ -919,7 +919,6 @@ detector.set_noise_floor(default_detector_noise_floor)
 detector.set_tune_antenna(0x01)
 # Prevent single isolated strikes from being logged => interrupts begin after 5 strikes, then are fired normally
 detector.set_min_strikes(detector_min_strikes)
-
 
 first_alert = datetime.min
 last_alert = datetime.min
