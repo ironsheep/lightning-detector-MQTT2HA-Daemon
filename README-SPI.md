@@ -18,6 +18,10 @@ When this script/daemon is run it will broadcast discovery topics via MQTT decri
 
 This script can be configured to be run in **daemon mode** continously in the background as a systemd service.
 
+## I2C or SPI
+
+**NOTE:** if you are using an I2C version of the AS3935 sensor board, please refer to [README.md](README.md) instead of this page!
+
 ---
 
 Hey, I will always appreciate your helping me out for a couple of :coffee:'s or :pizza: slices!
