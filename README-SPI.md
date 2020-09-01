@@ -110,7 +110,7 @@ On a modern Linux system just a few steps are needed to get the daemon working.
 The following example shows the installation on Debian/Raspbian below the `/opt` directory:
 
 ```shell
-sudo apt install git python3 python3-pip
+sudo apt install git python3 python3-pip python3-pigpio pigpio
 
 sudo git clone https://github.com/ironsheep/lightning-detector-MQTT2HA-Daemon /opt/ISP-lightning-mqtt-daemon
 
@@ -175,10 +175,17 @@ Now that the 'daemon' user is configured to allow access the hardware you can se
 
    sudo systemctl daemon-reload
 
-   sudo systemctl start isp-lightning.service
-   sudo systemctl status isp-lightning.service
-
+   # configure services so they start on reboot
+   sudo systemctl enable pigpiod.service
    sudo systemctl enable isp-lightning.service
+
+   # start services now
+   sudo systemctl start pigpiod.service
+   sudo systemctl start isp-lightning.service
+
+   # see if services are running (ensure no start errors)
+   sudo systemctl start pigpiod.service
+   sudo systemctl status isp-lightning.service
  ```
 
    *NOTE: we use a symbolic link 'ln -s' so that when you list the files in /etc/systemd/system the link will point back to where your project in installed.  You'll see that many other packages installed on your system already do this.*

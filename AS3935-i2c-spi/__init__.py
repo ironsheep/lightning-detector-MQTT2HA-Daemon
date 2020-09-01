@@ -1,2 +1,0 @@
-from AS3935-i2c-spi.AS3935 import AS3935, INT_L, INT_D, INT_NH
-from AS3935-i2c-spi.AS3935_SPI import AS3935_SPI, INT_L, INT_D, INT_NH

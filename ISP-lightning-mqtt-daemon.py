@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-from RPi_AS3935 import RPi_AS3935
+
 import RPi.GPIO as GPIO
 import _thread
 from datetime import datetime
@@ -26,7 +26,7 @@ from unidecode import unidecode
 import paho.mqtt.client as mqtt
 import sdnotify
 from signal import signal, SIGPIPE, SIG_DFL
-import spidev
+
 signal(SIGPIPE,SIG_DFL)
 
 script_version = "2.1.0"
@@ -874,26 +874,38 @@ def report_current_accumulator(topic):
 
 
 # -----------------------------------------------------------------------------
+#  Setup our INT pin (GPIO)
+# -----------------------------------------------------------------------------
+if opt_testing == False:
+    # Initialize GPIO
+    GPIO.setmode(GPIO.BCM)
+
+    # Use a software Pull-Down on interrupt pin
+    interrupt_pin = int(intr_pin)
+    GPIO.setup(interrupt_pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+
+# -----------------------------------------------------------------------------
 #  Ready our AS3935 connected via SPI for use...
 # -----------------------------------------------------------------------------
-if sensor_using_spi:
+if opt_testing == False and sensor_using_spi:
+    from AS3935.AS3935_i2c_spi import AS3935_SPI
     print_line('SPI configuration bus={} - device={}'.format(spi_bus, spi_device), verbose=True)
+
+    detector = AS3935_SPI(interrupt_pin, spi_device, spi_bus)
+    detector.max_speed_hz(1750000)  # 1,750,000 Hz (1.75 MHz)
+    detector.mode(0b00)     # [CPOL|CPHA], min: 0b00 = 0, max: 0b11 = 3
 
 # -----------------------------------------------------------------------------
 #  Ready our AS3935 connected via I2c for use...
 # -----------------------------------------------------------------------------
-
-
-
-# pin used for interrupts
-
-if sensor_using_spi == False:
+if opt_testing == False and sensor_using_spi == False:
+    from AS3935.AS3935_i2c_spi import AS3935_I2C
     # Rev. 1 Raspberry Pis should leave bus set at 0, while rev. 2 Pis should set
     # bus equal to 1. The address should be changed to match the address of the
     # detector IC.
     print_line('I2C configuration bus={} - addr={}'.format(i2c_bus, i2c_address), verbose=True)
 
-    detector = RPi_AS3935.RPi_AS3935(i2c_address, i2c_bus)
+    detector = AS3935_I2C(interrupt_pin, i2c_address, i2c_bus)
 
 # -----------------------------------------------------------------------------
 #  Now just talk with our AS3935 connected via I2c or SPI
@@ -904,7 +916,7 @@ if sensor_using_spi == False:
 detector.set_indoors(detector_afr_gain_indoor)
 detector.set_noise_floor(default_detector_noise_floor)
 # Change this value to the tuning value for your detector
-detector.calibrate(tun_cap=0x01)
+detector.set_tune_antenna(0x01)
 # Prevent single isolated strikes from being logged => interrupts begin after 5 strikes, then are fired normally
 detector.set_min_strikes(detector_min_strikes)
 
@@ -1010,7 +1022,7 @@ calculate_ring_widths()
 settingsData = OrderedDict()
 min_strikes = detector.get_min_strikes()
 indoors = detector.get_indoors()
-disp_lco = detector.get_disp_lco()
+disp_lco = detector.get_display_lco()
 noise_floor = detector.get_noise_floor()
 
 _thread.start_new_thread(send_settings, (min_strikes, indoors, disp_lco, noise_floor))
@@ -1023,16 +1035,12 @@ _thread.start_new_thread(send_settings, (min_strikes, indoors, disp_lco, noise_f
 # if we are getting data from our live sensor then configure our interrupt pin
 #  and attach our interrupt handler to it
 if opt_testing == False:
-    # Initialize GPIO
-    GPIO.setmode(GPIO.BCM)
 
-    # Use a software Pull-Down on interrupt pin
-    pin = int(intr_pin)
-    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+    # first clear our disturber... so it can reset itself...
     detector.set_mask_disturber(False)
 
     # now configure for run in main loop
-    GPIO.add_event_detect(pin, GPIO.RISING, callback=handle_interrupt)
+    GPIO.add_event_detect(interrupt_pin, GPIO.RISING, callback=handle_interrupt)
 
 
 # -----------------------------------------------------------------------------
@@ -1047,7 +1055,7 @@ if opt_testing == False:
         while True:
             # Read/clear the detector data every 10s in case we missed an interrupt (interrupts happening too fast ?)
             sleep(sleep_period)
-            handle_interrupt(pin)
+            handle_interrupt(interrupt_pin)
     finally:
         # cleanup used pins... just because we like cleaning up after us
         stopPeriodTimer()   # don't leave our timers running!

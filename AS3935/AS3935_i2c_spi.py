@@ -1,5 +1,5 @@
 """
-    AS3935 (C) 2019 Eloi Codina Torras
+    AS3935_I2C (C) 2019 Eloi Codina Torras
     AS3935_RPI derived from AS3935 by Stephen M. Moraco, Sep 1, 2020
 
     This program is free software: you can redistribute it and/or modify
@@ -25,7 +25,7 @@ INT_L = 0b1000
 
 # Add SPI support to this!
 
-class AS3935:
+class AS3935_I2C:
     def __init__(self, irq, bus=1, address=0x03):
         """
         Configure the main parameters of AS3935.
@@ -39,6 +39,24 @@ class AS3935:
         self.irq = irq
         self.pi = pigpio.pi()
         self.i2c_device = self.pi.i2c_open(bus, address)
+
+    def close():
+        """
+        Release the /dev/i2c-1 device!
+        """
+        self.pi.i2c_close()
+
+    # ------ CONFIGURE FUNCTIONS ------ #
+
+    def max_speed_hz(self, speedInHz):
+        """
+        NOTHING this is only used in SPI
+        """
+
+    def mode(self, modeBits):
+        """
+        NOTHING this is only used in SPI
+        """
 
     # ------ CROSS FUNCTIONS ------ #
 
@@ -322,7 +340,7 @@ class AS3935:
             bin_min = 0b00110000
         else:
             raise ValueError("Allowed values for min_strikes: 1, 5, 9, 16.")
-        self.write(0x02, (self.read_byte(0x02) & 0b11001111) | bin_min)
+        self.write_byte(0x02, (self.read_byte(0x02) & 0b11001111) | bin_min)
 
     def clear_lightning_stats(self):
         """
@@ -513,7 +531,7 @@ class AS3935:
         self.set_display_trco(False)
 
 """
-    (C) 2019 Eloi Codina Torras
+    New elements of the following are (C) 2020 Stephen M Moraco
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -584,7 +602,7 @@ class AS3935_SPI:
         """
         if not 0 <= address <= 63:
             raise ValueError("The address must be between 0x00 and 0x3F")
-        read_cmd = address & 0x3f | BITS_A7A6_READ
+        read_cmd = [ address & 0x3f | self.BITS_A7A6_READ ]
         bytesRead = self.spi_device.xfer3(read_cmd, count)
         if not len(bytesRead) == count:
             raise AssertionError('Failed to read {} byte(s) from SPI device!'.format(count))
@@ -616,7 +634,7 @@ class AS3935_SPI:
         if not 0 <= value <= 255:
             raise ValueError("The value must be between 0x00 and 0xFF")
 
-        write_cmd = [ address & 0x3f | BITS_A7A6_WRITE, value ]
+        write_cmd = [ address & 0x3f | self.BITS_A7A6_WRITE, value ]
         self.spi_device.writebytes(write_cmd)
         time.sleep(0.002)
 
@@ -882,7 +900,7 @@ class AS3935_SPI:
             bin_min = 0b00110000
         else:
             raise ValueError("Allowed values for min_strikes: 1, 5, 9, 16.")
-        self.write(0x02, (self.read_byte(0x02) & 0b11001111) | bin_min)
+        self.write_byte(0x02, (self.read_byte(0x02) & 0b11001111) | bin_min)
 
     def clear_lightning_stats(self):
         """
