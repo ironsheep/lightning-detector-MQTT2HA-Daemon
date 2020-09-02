@@ -215,6 +215,10 @@ Lead developer
 Iron Sheep Productions, LLC.
 ```
 
+If you find this kind of written explanation useful, helpful I would be honored by your helping me out for a couple of :coffee:'s or :pizza: slices!
+
+[![coffee](https://www.buymeacoffee.com/assets/img/custom_images/black_img.png)](https://www.buymeacoffee.com/ironsheep)
+
 ---
 
 Last Updated: 02 Aug 2020, 02:02 MST

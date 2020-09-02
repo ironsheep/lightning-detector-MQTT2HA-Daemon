@@ -565,6 +565,7 @@ class AS3935_SPI:
         self.spi_mode = 0b00    # default
         self.bitsPerWord = 8
         self.holdCsInMicroSec = 10
+        # configure spidev device
         self.spi_device = spidev.SpiDev()
         self.spi_device.open(bus, device)
         self.spi_device.lsbfirst = False
@@ -588,7 +589,7 @@ class AS3935_SPI:
 
     def mode(self, modeBits):
         """
-        Configures the SPI clock frequency
+        Configures SPI signal polarities
 
         :param modeBits: (int) SPI mode as two bit pattern of clock polarity and phase [CPOL|CPHA], min: 0b00 = 0, max: 0b11 = 3
         """
@@ -601,7 +602,7 @@ class AS3935_SPI:
 
     def read_bytes(self, address, count=1):
         """
-        Returns the value of the byte stored at address.
+        Returns the byte values read from starting address.
 
         :param address: (int) the address to read from (between 0x00 and 0x3F)
         :param count: (int) the number of bytes to be read (between 0x00 and 0x3F)
@@ -620,7 +621,7 @@ class AS3935_SPI:
 
     def read_byte(self, address):
         """
-        Returns the value of the byte stored at address.
+        Returns the value of the byte read from address.
 
         :param address: (int) the address to read from (between 0x00 and 0x3F)
         :return: (int) byte value read from the address (value between 0x00 and 0xFF)
