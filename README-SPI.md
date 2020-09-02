@@ -93,10 +93,10 @@ You'll need the AS3935 Lightning sensor to be connected via SPI to your RPi.  He
 | AS3935 Pin      | Module Pin  | Raspberry Pi Pin |
 |-----------------|-------------|------------------|
 | 4 (GND)         | GND         | 25 (Ground)   |
-| 5 (VDD)         | VCC         | 17 (3.3v)     |
+| 5 (VDD)         | 3V3         | 17 (3.3v)     |
 | 8 (CS)          | /CS         | 24 (CE0)     |
-| 10 (IRQ)        | IRQ         | 22 (GPIO 25) |
-| 11 (SCLK)       | SCLK        | 23 (SCLK)    |
+| 10 (IRQ)        | INT         | 22 (GPIO 25) |
+| 11 (SCL)        | SCK         | 23 (SCLK)    |
 | 12 (MISO)       | MISO        | 21 (MISO)    |
 | 13 (MOSI)       | MOSI        | 19 (MOSI)    |
 
