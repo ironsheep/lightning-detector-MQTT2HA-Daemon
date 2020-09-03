@@ -402,7 +402,9 @@ class AS3935_I2C:
         :param seconds_try: (float) seconds during which pulses on IRQ will be counted to calculate the internal frequency
         :return: (int) a tuning number between 0 and 15
         """
-        print("Please allow a long time for this function to stop. It should take 16*seconds_try*tries_frequency seconds")
+        #print("* Please allow a long time for this function to stop. It should take 16*seconds_try*tries_frequency seconds")
+        print("* Please allow a long time for this function to stop. It should take a little over 3 minutes to test the 16 values")
+
         self.set_frequency_division_ratio(frequency_divisor)
         frequency_target = 500000 / frequency_divisor
         best_tuner = 0
@@ -413,13 +415,14 @@ class AS3935_I2C:
             for i in range(tries_frequency):
                 freqs.append(self.calculate_resonance_frequency(seconds_try))
             freq = sum(freqs)/tries_frequency
-            print("For tuning {tun}: average frequency of {freq} Hz".format(tun=hex(current_tuner),
-                                                                            freq=freq*frequency_divisor))
             diff = abs(frequency_target - freq)
+            print("For tuning {tun}: average frequency of {freq:.6f} Hz (diff: {diff:+.1f})".format(tun=hex(current_tuner),
+                                                                            freq=freq*frequency_divisor, diff=diff))
             if diff < best_diff:
                 best_tuner = current_tuner
                 best_diff = diff
         self.set_tune_antenna(best_tuner)
+        print("- Your best tuning capacitor value is {tun}: which is off by {diff:+.1f}".format(tun=hex(best_tuner), diff=best_diff))
         return best_tuner
 
     def calculate_resonance_frequency(self, seconds):
@@ -973,7 +976,8 @@ class AS3935_SPI:
         :param seconds_try: (float) seconds during which pulses on IRQ will be counted to calculate the internal frequency
         :return: (int) a tuning number between 0 and 15
         """
-        print("Please allow a long time for this function to stop. It should take 16*seconds_try*tries_frequency seconds")
+        #print("* Please allow a long time for this function to stop. It should take 16*seconds_try*tries_frequency seconds")
+        print("* Please allow a long time for this function to stop. It should take a little over 3 minutes to test the 16 values")
         self.set_frequency_division_ratio(frequency_divisor)
         frequency_target = 500000 / frequency_divisor
         best_tuner = 0
@@ -984,13 +988,16 @@ class AS3935_SPI:
             for i in range(tries_frequency):
                 freqs.append(self.calculate_resonance_frequency(seconds_try))
             freq = sum(freqs)/tries_frequency
-            print("For tuning {tun}: average frequency of {freq} Hz".format(tun=hex(current_tuner),
-                                                                            freq=freq*frequency_divisor))
             diff = abs(frequency_target - freq)
+            print("For tuning {tun}: average frequency of {freq:.6f} Hz (diff: {diff:+.1f})".format(tun=hex(current_tuner),
+                                                                            freq=freq*frequency_divisor, diff=diff))
+
             if diff < best_diff:
                 best_tuner = current_tuner
                 best_diff = diff
         self.set_tune_antenna(best_tuner)
+        print("- Your best tuning capacitor value is {tun}: which is off by {diff:+.1f}".format(tun=hex(best_tuner),
+                                                                            diff=best_diff))
         return best_tuner
 
     def calculate_resonance_frequency(self, seconds):

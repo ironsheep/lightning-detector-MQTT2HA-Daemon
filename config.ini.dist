@@ -90,6 +90,12 @@
 #i2c_bus = 1
 #i2c_address = 0x03
 
+# Value to use for your board
+#   Internal Tuning Capacitors (from 0 to 120pF in steps of 8pf) - A value of [0-15]
+# run the script with a --tune paramater to determine value for your board
+#  NOTE: this runs for 3 minutes so be patient!  Then record your best value here.
+#tuning_capacitor = 0x1
+
 # Indoors (True) = more sensitive (can miss very strong lightnings)
 # Outdoors (False) = less sensitive (can miss far away lightnings)
 #detector_afr_gain_indoor = True

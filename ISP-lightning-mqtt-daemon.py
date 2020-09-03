@@ -88,7 +88,8 @@ parser = argparse.ArgumentParser(description=script_info, epilog='For further de
 parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
 parser.add_argument("-d", "--debug", help="show debug output", action="store_true")
 parser.add_argument("-f", '--test_filename', help='load detections from test filename instead of using sensor', default='')
-parser.add_argument("-t", '--test_scale', help='adjust test speed to run a ?x [Default 1x]', default='1')
+parser.add_argument("-s", '--test_scale', help='adjust test speed to run a ?x [Default 1x]', default='1')
+parser.add_argument("-t", "--calc_tuning_cap", help="run routine to calclulate tuning cap value for your board", action="store_true")
 parser.add_argument("-c", '--config_dir', help='set directory where config.ini is located', default=sys.path[0])
 parse_args = parser.parse_args()
 
@@ -98,14 +99,19 @@ opt_debug = parse_args.debug
 opt_verbose = parse_args.verbose
 opt_testing = len(test_filename) > 0
 opt_scale = int(parse_args.test_scale)
+opt_calc_tuning_cap = parse_args.calc_tuning_cap
 
+disable_mqtt = False
 print_line(script_info, info=True)
 if opt_verbose:
     print_line('Verbose enabled', info=True)
 if opt_debug:
     print_line('Debug enabled', debug=True)
 if opt_testing:
-    print_line('Mode TESTING... @ {}x speed'.format(opt_scale))
+    print_line('* Mode TESTING... @ {}x speed'.format(opt_scale))
+if opt_calc_tuning_cap:
+    print_line('* Mode: Calculate Tuning Cap value and exit')
+    disable_mqtt = True
 
 # -----------------------------------------------------------------------------
 #  MQTT handlers
@@ -184,7 +190,6 @@ default_distance_as = val_distance_as_km  # [km|mi]
 distance_as = config['Behavior'].get('distance_as', default_distance_as)
 
 
-
 # GPIO pin used for interrupts
 #  I2c = GPIO2/pin3/SDA, GPIO3/pin5/SCL
 #  SPI = GPI10/pin19/MOSI, GPIO9/pin21/MISO, GPIO11/pin23/SCLK, GPIO8/pin24/CE0, GPIO7/pin26/CE1
@@ -226,6 +231,15 @@ if config_spi_device.startswith('0x'):
 else:
     spi_device = int(config_spi_device)
 
+min_tuning_capacitor = 0
+max_tuning_capacitor = 15
+default_tuning_capacitor = '1'
+config_tuning_capacitor = config['Sensor'].get('tuning_capacitor', default_tuning_capacitor)
+if config_tuning_capacitor.startswith('0x'):
+    tuning_capacitor = int(config_tuning_capacitor,16)
+else:
+    tuning_capacitor = int(config_tuning_capacitor)
+
 default_detector_afr_gain_indoor = True
 detector_afr_gain_indoor = config['Sensor'].get('detector_afr_gain_indoor', default_detector_afr_gain_indoor)
 
@@ -239,8 +253,12 @@ detector_min_strikes = int(config['Sensor'].get('detector_min_strikes', default_
 
 # Check configuration
 #
+if (tuning_capacitor < min_tuning_capacitor) or (tuning_capacitor > max_tuning_capacitor):
+    print_line('ERROR: Invalid "tuning_capacitor" value found in configuration file: "config.ini"! Must be [{} - {}] Fix and try again... Aborting'.format(min_tuning_capacitor, max_tuning_capacitor), error=True, sd_notify=True)
+    sys.exit(1)
+
 if (interface_type != val_interface_type_i2c) and (interface_type != val_interface_type_spi):
-    print_line('ERROR: Invalid "sensor_attached" found in configuration file: "config.ini"! Must be [{} or {}] Fix and try again... Aborting'.format(val_interface_type_i2c, val_interface_type_spi), error=True, sd_notify=True)
+    print_line('ERROR: Invalid "sensor_attached" value found in configuration file: "config.ini"! Must be [{} or {}] Fix and try again... Aborting'.format(val_interface_type_i2c, val_interface_type_spi), error=True, sd_notify=True)
     sys.exit(1)
 
 if (period_in_minutes < min_period_in_minutes) or (period_in_minutes > max_period_in_minutes):
@@ -322,7 +340,8 @@ lwt_topic = '{}/sensor/{}/status'.format(base_topic, sensor_name.lower())
 lwt_online_val = 'Online'
 lwt_offline_val = 'Offline'
 
-print_line('Connecting to MQTT broker ...', verbose=True)
+if not disable_mqtt:
+    print_line('Connecting to MQTT broker ...', verbose=True)
 mqtt_client = mqtt.Client()
 mqtt_client.on_connect = on_connect
 mqtt_client.on_publish = on_publish
@@ -344,26 +363,27 @@ if config['MQTT'].getboolean('tls', False):
 mqtt_username = os.environ.get("MQTT_USERNAME", config['MQTT'].get('username'))
 mqtt_password = os.environ.get("MQTT_PASSWORD", config['MQTT'].get('password', None))
 
-if mqtt_username:
-    mqtt_client.username_pw_set(mqtt_username, mqtt_password)
-try:
-    mqtt_client.connect(os.environ.get('MQTT_HOSTNAME', config['MQTT'].get('hostname', 'localhost')),
-                        port=int(os.environ.get('MQTT_PORT', config['MQTT'].get('port', '1883'))),
-                        keepalive=config['MQTT'].getint('keepalive', 60))
-except:
-    print_line('MQTT connection error. Please check your settings in the configuration file "config.ini"', error=True, sd_notify=True)
-    sys.exit(1)
-else:
-    mqtt_client.publish(lwt_topic, payload=lwt_online_val, retain=False)
-    mqtt_client.loop_start()
+if not disable_mqtt:
+    if mqtt_username:
+        mqtt_client.username_pw_set(mqtt_username, mqtt_password)
+    try:
+        mqtt_client.connect(os.environ.get('MQTT_HOSTNAME', config['MQTT'].get('hostname', 'localhost')),
+                            port=int(os.environ.get('MQTT_PORT', config['MQTT'].get('port', '1883'))),
+                            keepalive=config['MQTT'].getint('keepalive', 60))
+    except:
+        print_line('MQTT connection error. Please check your settings in the configuration file "config.ini"', error=True, sd_notify=True)
+        sys.exit(1)
+    else:
+        mqtt_client.publish(lwt_topic, payload=lwt_online_val, retain=False)
+        mqtt_client.loop_start()
 
-    while mqtt_client_connected == False: #wait in loop
-        print_line('* Wait on mqtt_client_connected=[{}]'.format(mqtt_client_connected), debug=True)
-        sleep(1.0) # some slack to establish the connection
+        while mqtt_client_connected == False: #wait in loop
+            print_line('* Wait on mqtt_client_connected=[{}]'.format(mqtt_client_connected), debug=True)
+            sleep(1.0) # some slack to establish the connection
 
-    startAliveTimer()
+        startAliveTimer()
 
-sd_notifier.notify('READY=1')
+    sd_notifier.notify('READY=1')
 
 # -----------------------------------------------------------------------------
 #  Perform our MQTT Discovery Announcement...
@@ -402,7 +422,8 @@ detectorValues = OrderedDict([
     (LD_PAST_RINGS, dict(title="Past RingSet", device_class="timestamp", no_title_prefix="yes", json_values="yes"))
 ])
 
-print_line('Announcing Lightning Detection device to MQTT broker for auto-discovery ...')
+if not disable_mqtt:
+    print_line('Announcing Lightning Detection device to MQTT broker for auto-discovery ...')
 
 base_topic = '{}/sensor/{}'.format(base_topic, sensor_name.lower())
 settings_topic = '{}/settings'.format(base_topic)
@@ -456,7 +477,9 @@ for [sensor, params] in detectorValues.items():
          payload['dev'] = {
                 'identifiers' : ["{}".format(uniqID)],
          }
-    mqtt_client.publish(discovery_topic, json.dumps(payload), 1, retain=True)
+
+    if not disable_mqtt:
+        mqtt_client.publish(discovery_topic, json.dumps(payload), 1, retain=True)
 
 
 # -----------------------------------------------------------------------------
@@ -915,8 +938,8 @@ if opt_testing == False and sensor_using_spi == False:
 # Outdoors = less sensitive (can miss far away lightnings)
 detector.set_indoors(detector_afr_gain_indoor)
 detector.set_noise_floor(default_detector_noise_floor)
-# Change this value to the tuning value for your detector
-detector.set_tune_antenna(0x01)
+# Tuning value for the detector
+detector.set_tune_antenna(tuning_capacitor)
 # Prevent single isolated strikes from being logged => interrupts begin after 5 strikes, then are fired normally
 detector.set_min_strikes(detector_min_strikes)
 
@@ -1024,7 +1047,8 @@ indoors = detector.get_indoors()
 disp_lco = detector.get_display_lco()
 noise_floor = detector.get_noise_floor()
 
-_thread.start_new_thread(send_settings, (min_strikes, indoors, disp_lco, noise_floor))
+if not disable_mqtt:
+    _thread.start_new_thread(send_settings, (min_strikes, indoors, disp_lco, noise_floor))
 
 
 # -----------------------------------------------------------------------------
@@ -1033,7 +1057,7 @@ _thread.start_new_thread(send_settings, (min_strikes, indoors, disp_lco, noise_f
 
 # if we are getting data from our live sensor then configure our interrupt pin
 #  and attach our interrupt handler to it
-if opt_testing == False:
+if opt_testing == False and opt_calc_tuning_cap == False:
 
     # first clear our disturber... so it can reset itself...
     detector.set_mask_disturber(False)
@@ -1045,9 +1069,10 @@ if opt_testing == False:
 # -----------------------------------------------------------------------------
 #  Run our detection loop
 # -----------------------------------------------------------------------------
-print_line("Waiting for lightning - or at least something that looks like it", verbose=True)
+if not disable_mqtt:
+    print_line("Waiting for lightning - or at least something that looks like it", verbose=True)
 
-if opt_testing == False:
+if opt_testing == False and opt_calc_tuning_cap == False:
     # NOTE: we don't start our timer here... we wait until first detection!
 
     try:
@@ -1060,7 +1085,10 @@ if opt_testing == False:
         stopPeriodTimer()   # don't leave our timers running!
         stopAliveTimer()
         GPIO.cleanup()
-
+elif opt_calc_tuning_cap == True:
+    # calculate our value and end the run
+    print_line("Calculating Tuning Capacitor Value", verbose=True)
+    detector.calculate_tuning_cap()
 else:
 
     # we ARE testing, meaning we are loading detection info from our test file!
