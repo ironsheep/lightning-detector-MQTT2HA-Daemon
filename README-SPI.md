@@ -93,10 +93,10 @@ You'll need the AS3935 Lightning sensor to be connected via SPI to your RPi.  He
 | AS3935 Pin      | Module Pin  | Raspberry Pi Pin |
 |-----------------|-------------|------------------|
 | 4 (GND)         | GND         | 25 (Ground)   |
-| 5 (VDD)         | VCC         | 17 (3.3v)     |
+| 5 (VDD)         | 3V3         | 17 (3.3v)     |
 | 8 (CS)          | /CS         | 24 (CE0)     |
-| 10 (IRQ)        | IRQ         | 22 (GPIO 25) |
-| 11 (SCLK)       | SCLK        | 23 (SCLK)    |
+| 10 (IRQ)        | INT         | 22 (GPIO 25) |
+| 11 (SCL)        | SCK         | 23 (SCLK)    |
 | 12 (MISO)       | MISO        | 21 (MISO)    |
 | 13 (MOSI)       | MOSI        | 19 (MOSI)    |
 
@@ -132,7 +132,13 @@ vim /ISP-lightning-mqtt-daemon/config.ini
 
 When you are ready to test your adjustments to the config.ini file you can start an MQTT monitor tool to see what your newly adjusted script will do. (I use [MQTTBox](http://workswithweb.com/mqttbox.html) to monitor all my MQTT testing.)
 
-Once you are ready to monitor then a first test run is as easy as:
+Once you are ready to monitor, first start the PiGPIOd service
+
+```shell
+sudo systemctl start pigpiod.service
+```
+
+Then a first test run is as easy as:
 
 ```shell
 python3 /opt/ISP-lightning-mqtt-daemon/ISP-lightning-mqtt-daemon.py
@@ -184,7 +190,7 @@ Now that the 'daemon' user is configured to allow access the hardware you can se
    sudo systemctl start isp-lightning.service
 
    # see if services are running (ensure no start errors)
-   sudo systemctl start pigpiod.service
+   sudo systemctl status pigpiod.service
    sudo systemctl status isp-lightning.service
  ```
 
