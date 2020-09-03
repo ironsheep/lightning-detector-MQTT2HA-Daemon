@@ -29,7 +29,7 @@ from signal import signal, SIGPIPE, SIG_DFL
 
 signal(SIGPIPE,SIG_DFL)
 
-script_version = "2.1.9"
+script_version = "2.2.0"
 script_name = 'ISP-lightning-mqtt-daemon.py'
 script_info = '{} v{}'.format(script_name, script_version)
 project_name = 'lightning-detector-MQTT2HA-Daemon'
@@ -569,7 +569,10 @@ def send_status(timestamp, energy, distance, strikeCount):
     statusData = OrderedDict()
     statusData[LD_TIMESTAMP] = timestamp.astimezone().replace(microsecond=0).isoformat()
     statusData[LD_ENERGY] = energy
-    statusData[LD_DISTANCE] = distance
+    if distance == None:
+        statusData[LD_DISTANCE] = 'out of range'
+    else:
+        statusData[LD_DISTANCE] = distance
     statusData[LD_COUNT] = strikeCount
 
     print_line('Publishing to MQTT topic "{}, Data:{}"'.format(state_topic, json.dumps(statusData)))
@@ -693,8 +696,11 @@ def calculate_ring_widths():
 
 def binIndexFromDistance(distance):
     try:
+        testDistance = distance
+        if distance == None:
+            testDistance = 63
         # given distance determine index value for it... NOTE: 1=idx-0 and 63=idx-15
-        desiredBinIndex = distanceValueToIndexList.index(distance)
+        desiredBinIndex = distanceValueToIndexList.index(testDistance)
         # if we have 1-14 let's translate it into a ring index value [1-[3-7]]
         if desiredBinIndex > 0 and desiredBinIndex < 15:
             desiredBinIndex = binIndexesForThisRun[desiredBinIndex - 1]
@@ -939,7 +945,9 @@ if opt_testing == False and sensor_using_spi == False:
 detector.set_indoors(detector_afr_gain_indoor)
 detector.set_noise_floor(default_detector_noise_floor)
 # Tuning value for the detector
-detector.set_tune_antenna(tuning_capacitor)
+#detector.set_tune_antenna(tuning_capacitor)
+print_line('* calibrate with antenna cap. set to {}'.format(hex(tuning_capacitor)), verbose=True)
+detector.full_calibration(tuning_capacitor)
 # Prevent single isolated strikes from being logged => interrupts begin after 5 strikes, then are fired normally
 detector.set_min_strikes(detector_min_strikes)
 
@@ -993,7 +1001,11 @@ def handle_interrupt(channel):
                 energy = synth_energy
 
             strikes_since_last_alert += 1
-            print_line(" -- Energy: " + str(energy) + " - distance: " + str(distance) + "km")
+
+            distanceStr = str(distance) + "km"
+            if distance == None:
+                distanceStr = 'out-of-range'
+            print_line(" -- Energy: " + str(energy) + " - Distance: " + distanceStr)
 
             # if we are past the end of this period then snap it and start accumulating all over
             if last_alert != datetime.min and (current_timestamp - last_alert).seconds > period_in_minutes * 60:

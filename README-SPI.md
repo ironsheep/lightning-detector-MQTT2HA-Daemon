@@ -149,8 +149,53 @@ Using the command line argument `--config`, a directory where to read the config
 ```shell
 python3 /opt/ISP-lightning-mqtt-daemon/ISP-lightning-mqtt-daemon.py --config /opt/ISP-lightning-mqtt-daemon
 ```
+## Antenna Fine Tuning
 
-### Run as Daemon / Service
+The AS3935 has a fine tuning adjustment setting for the 500KHz antenna. Our script has a special option we can use to determine the fine-tuning value our board needs. After running the script we then record the value in our config.ini.
+
+Run the fine tuning option using:
+
+```shell
+python3 /opt/ISP-lightning-mqtt-daemon/ISP-lightning-mqtt-daemon.py --calc_tuning_cap
+```
+
+the output will look something like (yours will be different!):
+
+```shell
+* Please allow a long time for this function to stop. It should take a little over 3 minutes to check test the 16 values
+For tuning 0x0: average frequency of 511695.239310 Hz (diff: +731.0)
+For tuning 0x1: average frequency of 511706.015761 Hz (diff: +731.6)
+For tuning 0x2: average frequency of 507383.793496 Hz (diff: +461.5)
+For tuning 0x3: average frequency of 507158.814087 Hz (diff: +447.4)
+For tuning 0x4: average frequency of 503960.562001 Hz (diff: +247.5)
+For tuning 0x5: average frequency of 504470.100857 Hz (diff: +279.4)
+For tuning 0x6: average frequency of 502103.026784 Hz (diff: +131.4)
+For tuning 0x7: average frequency of 500849.485221 Hz (diff: +53.1)
+For tuning 0x8: average frequency of 498205.778733 Hz (diff: +112.1)
+For tuning 0x9: average frequency of 495721.390191 Hz (diff: +267.4)
+For tuning 0xa: average frequency of 497672.497232 Hz (diff: +145.5)
+For tuning 0xb: average frequency of 494356.500465 Hz (diff: +352.7)
+For tuning 0xc: average frequency of 490485.394396 Hz (diff: +594.7)
+For tuning 0xd: average frequency of 491429.095599 Hz (diff: +535.7)
+For tuning 0xe: average frequency of 489151.314855 Hz (diff: +678.0)
+For tuning 0xf: average frequency of 490377.098284 Hz (diff: +601.4)
+- Your best tuning capacitor value is 0x7: which is off by +53.1
+```
+
+now you need to add the 0x7 from the last line (above) to the config.ini.  Look for the **[Sensor]** section and in there add a line:
+
+```shell
+tuning_capacitor = 0x7
+```
+
+(*If you have qeustions about this take a look at the `config.ini.dist` file as it shows where the new entry should be.*)
+
+Save the file, and do a quick test again to make sure the script is ok with your config change. 
+
+
+Now you are ready to enable the detector script. 
+
+## Run as Daemon / Service
 
 You probably want to execute this script **continuously in the background**.
 
