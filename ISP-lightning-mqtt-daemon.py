@@ -940,6 +940,32 @@ if opt_testing == False and sensor_using_spi == False:
 #  Now just talk with our AS3935 connected via I2c or SPI
 # -----------------------------------------------------------------------------
 
+# but first, let's see if we have a communicating device!
+print_line('- Testing AS3935 Communications...', debug=True)
+testValue = 0x05
+cooperatingDevice = True
+detector.set_noise_floor(testValue)
+noiseFloor = detector.get_noise_floor()
+print_line('- TEST write={}, read-back={}'.format(testValue, noiseFloor), debug=True)
+if noiseFloor != testValue:
+    cooperatingDevice = False
+
+testValue = 0x02    # inverted pattern
+detector.set_noise_floor(testValue)
+noiseFloor = detector.get_noise_floor()
+print_line('- TEST write={}, read-back={}'.format(testValue, noiseFloor), debug=True)
+if noiseFloor != testValue:
+    cooperatingDevice = False
+
+if not cooperatingDevice:
+    print_line('* AS3925 Comms not working!  Aborting', error=True)
+    #kill main thread
+    os._exit(1)
+else:
+    print_line('* Have good comms with AS3935', verbose=True)
+
+# reset the chip to defaults
+detector.set_default_values()
 # Indoors = more sensitive (can miss very strong lightnings)
 # Outdoors = less sensitive (can miss far away lightnings)
 detector.set_indoors(detector_afr_gain_indoor)
