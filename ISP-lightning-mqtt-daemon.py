@@ -29,7 +29,7 @@ from signal import signal, SIGPIPE, SIG_DFL
 
 signal(SIGPIPE,SIG_DFL)
 
-script_version = "2.2.0"
+script_version = "2.2.1"
 script_name = 'ISP-lightning-mqtt-daemon.py'
 script_info = '{} v{}'.format(script_name, script_version)
 project_name = 'lightning-detector-MQTT2HA-Daemon'
