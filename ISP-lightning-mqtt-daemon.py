@@ -29,7 +29,7 @@ from signal import signal, SIGPIPE, SIG_DFL
 
 signal(SIGPIPE,SIG_DFL)
 
-script_version = "2.2.1"
+script_version = "2.2.2"
 script_name = 'ISP-lightning-mqtt-daemon.py'
 script_info = '{} v{}'.format(script_name, script_version)
 project_name = 'lightning-detector-MQTT2HA-Daemon'
@@ -85,12 +85,12 @@ def clean_identifier(name):
 
 # Argparse
 parser = argparse.ArgumentParser(description=script_info, epilog='For further details see: ' + project_url)
-parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
-parser.add_argument("-d", "--debug", help="show debug output", action="store_true")
-parser.add_argument("-f", '--test_filename', help='load detections from test filename instead of using sensor', default='')
-parser.add_argument("-s", '--test_scale', help='adjust test speed to run a ?x [Default 1x]', default='1')
-parser.add_argument("-t", "--calc_tuning_cap", help="run routine to calclulate tuning cap value for your board", action="store_true")
-parser.add_argument("-c", '--config_dir', help='set directory where config.ini is located', default=sys.path[0])
+parser.add_argument("-v", "--verbose", help="increase output (v)erbosity", action="store_true")
+parser.add_argument("-d", "--debug", help="show (d)ebug output", action="store_true")
+parser.add_argument("-t", '--test_filename', help='load detections from (t)est filename instead of using sensor', default='')
+parser.add_argument("-s", '--test_scale', help='adjust test (s)peed to run a ?x [Default 1x]', default='1')
+parser.add_argument("-a", "--calc_tuning_cap", help="run routine to calclulate tuning c(a)p value for your board", action="store_true")
+parser.add_argument("-c", '--config_dir', help='set directory where (c)onfig.ini is located', default=sys.path[0])
 parse_args = parser.parse_args()
 
 config_dir = parse_args.config_dir
@@ -341,7 +341,7 @@ lwt_online_val = 'Online'
 lwt_offline_val = 'Offline'
 
 if not disable_mqtt:
-    print_line('Connecting to MQTT broker ...', verbose=True)
+    print_line('* Connecting to MQTT broker ...', verbose=True)
 mqtt_client = mqtt.Client()
 mqtt_client.on_connect = on_connect
 mqtt_client.on_publish = on_publish
@@ -918,7 +918,7 @@ if opt_testing == False:
 # -----------------------------------------------------------------------------
 if opt_testing == False and sensor_using_spi:
     from AS3935.AS3935_i2c_spi import AS3935_SPI
-    print_line('SPI configuration bus={} - device={}'.format(spi_bus, spi_device), verbose=True)
+    print_line('* SPI configuration bus={} - device={}'.format(spi_bus, spi_device), verbose=True)
 
     detector = AS3935_SPI(interrupt_pin, spi_device, spi_bus)
     detector.max_speed_hz(1250000)  # 1,250,000 Hz (1.25 MHz)
@@ -932,7 +932,7 @@ if opt_testing == False and sensor_using_spi == False:
     # Rev. 1 Raspberry Pis should leave bus set at 0, while rev. 2 Pis should set
     # bus equal to 1. The address should be changed to match the address of the
     # detector IC.
-    print_line('I2C configuration bus={} - addr={}'.format(i2c_bus, i2c_address), verbose=True)
+    print_line('* I2C configuration bus={} - addr={}'.format(i2c_bus, i2c_address), verbose=True)
 
     detector = AS3935_I2C(interrupt_pin, i2c_address, i2c_bus)
 
@@ -972,7 +972,7 @@ detector.set_indoors(detector_afr_gain_indoor)
 detector.set_noise_floor(default_detector_noise_floor)
 # Tuning value for the detector
 #detector.set_tune_antenna(tuning_capacitor)
-print_line('* calibrate with antenna cap. set to {}'.format(hex(tuning_capacitor)), verbose=True)
+print_line('* Calibrate with antenna cap. set to {}'.format(hex(tuning_capacitor)), verbose=True)
 detector.full_calibration(tuning_capacitor)
 # Prevent single isolated strikes from being logged => interrupts begin after 5 strikes, then are fired normally
 detector.set_min_strikes(detector_min_strikes)
@@ -1108,7 +1108,7 @@ if opt_testing == False and opt_calc_tuning_cap == False:
 #  Run our detection loop
 # -----------------------------------------------------------------------------
 if not disable_mqtt:
-    print_line("Waiting for lightning - or at least something that looks like it", verbose=True)
+    print_line("* Waiting for lightning - or at least something that looks like it", verbose=True)
 
 if opt_testing == False and opt_calc_tuning_cap == False:
     # NOTE: we don't start our timer here... we wait until first detection!
@@ -1125,7 +1125,7 @@ if opt_testing == False and opt_calc_tuning_cap == False:
         GPIO.cleanup()
 elif opt_calc_tuning_cap == True:
     # calculate our value and end the run
-    print_line("Calculating Tuning Capacitor Value", verbose=True)
+    print_line("* Calculating Tuning Capacitor Value", verbose=True)
     detector.calculate_tuning_cap()
 else:
 
@@ -1140,7 +1140,7 @@ else:
             continue
         detection_count += 1
 
-    print_line('TESTing: - Running {} detections from "{}"'.format(detection_count, test_filename), verbose=True)
+    print_line('* TESTing: - Running {} detections from "{}"'.format(detection_count, test_filename), verbose=True)
 
     curr_time_in_seconds = 0.0
     for currLine in lines:
@@ -1160,7 +1160,7 @@ else:
         handle_interrupt(TEST_INTERRUPT)
         curr_time_in_seconds = dispatch_time_seconds
 
-    print_line("TESTing: Detections ended...  waiting to detect storm end", verbose=True)
+    print_line("* TESTing: Detections ended...  waiting to detect storm end", verbose=True)
     wait_time = 35 * 60 # storm is 30 minutes, let's add extra 5 min... then convert to seconds
     print_line('- waiting for {} seconds'.format(wait_time), debug=True)
     sleep(wait_time)
