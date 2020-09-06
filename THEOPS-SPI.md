@@ -1,4 +1,4 @@
-# Theory of Operations: SPI for AS3935 
+# Researching SPI support for AS3935 
 ## lightning-detector-MQTT2HA-Daemon
 
 ![Project Maintenance][maintenance-shield]
