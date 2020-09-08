@@ -190,10 +190,10 @@ tuning_capacitor = 0x7
 
 (*If you have qeustions about this take a look at the `config.ini.dist` file as it shows where the new entry should be.*)
 
-Save the file, and do a quick test again to make sure the script is ok with your config change. 
+Save the file, and do a quick test again to make sure the script is ok with your config change.
 
 
-Now you are ready to enable the detector script. 
+Now you are ready to enable the detector script.
 
 ## Run as Daemon / Service
 
@@ -286,11 +286,9 @@ Lastly, there are two additional topics published which are used to drive our ne
 
 - "`{base_topic}/{sensorName}/prings`" - which posts the status of the preceeding full period, updated at the end of a period
 
-
 ## Lovelace Card for Home Assistant
 
 Want to go further?  There is a [Lovelace Lightning Detector Card](https://github.com/ironsheep/lovelace-lightning-detector-card) built specifically for visualizing this lightning data.
-
 
 ## Credits
 
@@ -298,7 +296,7 @@ Thank you to "Hexalyse" for providing the starting logic for this effort. His pr
 
 Thank you to also Thomas Dietrich for providing a wonderful pattern for this project. His project, which I use and heartily recommend, is [miflora-mqtt-deamon](https://github.com/ThomDietrich/miflora-mqtt-daemon)
 
-
+Thank you to Eloi Codina for providing the  I2C source for AS3935 I2C access [AS3935 v0.1.4](https://pypi.org/project/as3935/)
 
 ## Disclaimer and Legal
 

@@ -1,4 +1,4 @@
-# Researching SPI support for AS3935 
+# Researching SPI support for AS3935
 ## lightning-detector-MQTT2HA-Daemon
 
 ![Project Maintenance][maintenance-shield]
@@ -40,7 +40,7 @@ Since we are looking for how to configure our SPI bus let's go strait to the sec
 
 The first thing we find is that our AS3935 Maximum clock freq. is 2Mhz. So we need to make sure we stay at 2Mhz or something lower.  *NOTE* also that there's a warning about frequencies around the 500kHz resonant frequency of our detector antenna so we should probably stay well above this frequency as well.
 
-In the next section entitled "**SPI Command Structure**" we start learning about our commands. but as we are getting to that, we see something significant! 
+In the next section entitled "**SPI Command Structure**" we start learning about our commands. but as we are getting to that, we see something significant!
 
 ```
 An SPI command consists of two bytes in series with the data being sampled on
@@ -49,7 +49,7 @@ the falling edge of SCLK (CPHA=1)
 
 We then find out that this device supports two types of commands: Read and Write. This is pretty logical.  They also call out a specific form of write called a "Direct Write" which we'll learn more about later in this section.
 
-The device registers are numbered from 0x00 to 0x3B. 
+The device registers are numbered from 0x00 to 0x3B.
 
 The AS3935 SPI write can be seen in "**Figure 28: SPI Page Write**" (*bottom of Pg 22 in the PDF linked above.*)  We see here that this is a simple consecutive write of N bytes with the first byte specifying the starting address to be written with subsequent bytes being written to the start+0, start+1, start+2, ... locations.
 
@@ -76,7 +76,7 @@ Let's move on to studying the RPi.
 
 ## Researching our Host (the RPi)
 
-Now we need to learn about the SPI subsytem of the RPi. For this let's refer to the [SPI section](https://www.raspberrypi.org/documentation/hardware/raspberrypi/spi/README.md) of the Official Doumentation.  By reading this page we learn that SPI is not enabled by default and the preferred way to enable it is to run `sudo raspi-config` and enable the SPI hardware. We then see that once enabled, our SPI device will show up as `/dev/spidev0.0`.  
+Now we need to learn about the SPI subsytem of the RPi. For this let's refer to the [SPI section](https://www.raspberrypi.org/documentation/hardware/raspberrypi/spi/README.md) of the Official Doumentation.  By reading this page we learn that SPI is not enabled by default and the preferred way to enable it is to run `sudo raspi-config` and enable the SPI hardware. We then see that once enabled, our SPI device will show up as `/dev/spidev0.0`.
 
 In the section entitled "**Hardware**" we learn that the Standard Master mode is enabled by default. Good, this is what we'll need.
 
@@ -132,7 +132,7 @@ Here's the configuration code I use:
 
 ```python
    from AS3935.AS3935_i2c_spi import AS3935_SPI
-   
+
     # note: spi_device=0, spi_bus=0 matching /dev/spidev0.0
 
     detector = AS3935_SPI(interrupt_pin, spi_device, spi_bus)
@@ -215,7 +215,7 @@ Next, let's look into `AS3935.AS3935_i2c_spi` implementation of the reads and wr
         return bytesRequested
 ```
 
-This is our many value read. (we mostly do single value reads until we need to read the detection strength then we read values from 3 consectutive registers. (*read starting at for length of 3*)  
+This is our many value read. (we mostly do single value reads until we need to read the detection strength then we read values from 3 consectutive registers. (*read starting at for length of 3*)
 
 Next, we have a simplifying method for single byte reads:
 
@@ -234,15 +234,15 @@ Next, we have a simplifying method for single byte reads:
         return bytesRead[0]
 ```
 
-I added this simply because there are so many times we want to just read 1 byte from an address so pulling the single-byte value from the list in one place just made sense.  
+I added this simply because there are so many times we want to just read 1 byte from an address so pulling the single-byte value from the list in one place just made sense.
 
 Lastly here's our write:
 
 ```python
     def write_byte(self, address, value):
         """
-        Writes value at address. 
- 
+        Writes value at address.
+
         :param address: (int) the address to write to (between 0x00 and 0x3F)
         :param value: (int) the byte value (between 0x00 and 0xFF)
         """
@@ -271,7 +271,7 @@ When writing code to drive hardware you have to measure the signals passed betwe
 
 ![Test Hardware](Docs/images/test-hardware.jpg)
 
-The colored probes you see (above) are connected to my [SQ200 from ikalogic.com](https://www.ikalogic.com/sq-logic-analyzer-pattern-generator/) an inexpensive ~$175 Logic Analyzer / Pattern Generator. It comes with ScanaStudio software which automatically decodes most protocols I use in my play/work efforts.  (*Yes, it even decodes the SPI protocol!*) 
+The colored probes you see (above) are connected to my [SQ200 from ikalogic.com](https://www.ikalogic.com/sq-logic-analyzer-pattern-generator/) an inexpensive ~$175 Logic Analyzer / Pattern Generator. It comes with ScanaStudio software which automatically decodes most protocols I use in my play/work efforts.  (*Yes, it even decodes the SPI protocol!*)
 
 Here is the picture I took of the scanstudio screen recording the proof of our SPI clock setup, polarities and showing that the AS3935 actually responding!
 
@@ -299,7 +299,7 @@ Ok, that's all I have for this document. I hope what I have written here has hel
 
 *If you have any questions about what I've written here, file an issue and I'll respond with edits to this doc to attempt to make things more clear.*
 
-Thanks for Reading, following along. 
+Thanks for Reading, following along.
 
 ```
 Stephen M. Moraco

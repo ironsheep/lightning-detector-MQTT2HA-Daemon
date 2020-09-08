@@ -573,7 +573,7 @@ class AS3935_I2C(AS3935_Base):
         :param address: (int) the address to read from
         :return: (int) the value of the address
         """
-        return self.pi.i2c_read_byte_data(self.i2c_device, address)
+        return self.pi.i2c_read_byte_data(self.device, address)
 
     def write_byte(self, address, value):
         """
@@ -585,7 +585,7 @@ class AS3935_I2C(AS3935_Base):
         """
         if not 0 <= value <= 255:
             raise ValueError("The value should be between 0x00 and 0xFF")
-        self.pi.i2c_write_byte_data(self.i2c_device, address, value)
+        self.pi.i2c_write_byte_data(self.device, address, value)
         time.sleep(0.002)
 
 

@@ -29,7 +29,7 @@ from signal import signal, SIGPIPE, SIG_DFL
 
 signal(SIGPIPE,SIG_DFL)
 
-script_version = "2.2.2"
+script_version = "2.2.3"
 script_name = 'ISP-lightning-mqtt-daemon.py'
 script_info = '{} v{}'.format(script_name, script_version)
 project_name = 'lightning-detector-MQTT2HA-Daemon'
@@ -934,7 +934,7 @@ if opt_testing == False and sensor_using_spi == False:
     # detector IC.
     print_line('* I2C configuration bus={} - addr={}'.format(i2c_bus, i2c_address), verbose=True)
 
-    detector = AS3935_I2C(interrupt_pin, i2c_address, i2c_bus)
+    detector = AS3935_I2C(interrupt_pin, i2c_bus, i2c_address)
 
 # -----------------------------------------------------------------------------
 #  Now just talk with our AS3935 connected via I2c or SPI
