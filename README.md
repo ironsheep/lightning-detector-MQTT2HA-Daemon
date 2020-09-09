@@ -22,6 +22,13 @@ This script can be configured to be run in **daemon mode** continously in the ba
 
 **NOTE:** if you are using an SPI version of the AS3935 sensor board, please refer to [README-SPI.md](README-SPI.md) instead of this page!
 
+If you choose to use I2C, make sure that I2C is enabled on your Raspberry Pi:
+
+```shell
+raspi-config
+```
+Then go to Interfacing Options -> I2C -> Yes -> Ok.
+
 ---
 
 Hey, I will always appreciate your helping me out for a couple of :coffee:'s or :pizza: slices!
@@ -213,7 +220,7 @@ By default the **isp-lightning.service** file indicates that the script should b
 Now that the 'daemon' user is configured to allow access the hardware you can setup the script to be run as a system service as follows:
 
  ```shell
-   sudo ln -s /opt/ISP-RPi-mqtt-daemon/isp-lightning.service /etc/systemd/system/isp-lightning.service
+   sudo ln -s /opt/ISP-lightning-mqtt-daemon/isp-lightning.service /etc/systemd/system/isp-lightning.service
 
    sudo systemctl daemon-reload
 
