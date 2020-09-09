@@ -25,9 +25,12 @@ This script can be configured to be run in **daemon mode** continously in the ba
 If you choose to use I2C, make sure that I2C is enabled on your Raspberry Pi:
 
 ```shell
-raspi-config
+sudo raspi-config
 ```
+
 Then go to Interfacing Options -> I2C -> Yes -> Ok.
+
+*Upon saving these changes your RPi will reboot*
 
 ---
 

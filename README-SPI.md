@@ -22,6 +22,16 @@ This script can be configured to be run in **daemon mode** continously in the ba
 
 **NOTE:** if you are using an I2C version of the AS3935 sensor board, please refer to [README.md](README.md) instead of this page!
 
+If you choose to use SPI, make sure that SPI is enabled on your Raspberry Pi:
+
+```shell
+sudo raspi-config
+```
+
+Then go to Interfacing Options -> SPI -> Yes -> Ok.
+
+*Upon saving these changes your RPi will reboot*
+
 ---
 
 Hey, I will always appreciate your helping me out for a couple of :coffee:'s or :pizza: slices!
