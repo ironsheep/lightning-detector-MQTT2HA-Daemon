@@ -29,7 +29,7 @@ from signal import signal, SIGPIPE, SIG_DFL
 
 signal(SIGPIPE,SIG_DFL)
 
-script_version = "2.2.4"
+script_version = "2.2.5"
 script_name = 'ISP-lightning-mqtt-daemon.py'
 script_info = '{} v{}'.format(script_name, script_version)
 project_name = 'lightning-detector-MQTT2HA-Daemon'
@@ -975,6 +975,7 @@ detector.set_noise_floor(default_detector_noise_floor)
 #detector.set_tune_antenna(tuning_capacitor)
 print_line('* Calibrate with antenna cap. set to {}'.format(hex(tuning_capacitor)), verbose=True)
 detector.full_calibration(tuning_capacitor)
+print_line('- Calibration Complete -', verbose=True)
 # Prevent single isolated strikes from being logged => interrupts begin after 5 strikes, then are fired normally
 detector.set_min_strikes(detector_min_strikes)
 

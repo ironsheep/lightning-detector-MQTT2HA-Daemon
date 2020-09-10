@@ -545,7 +545,7 @@ class AS3935_Base:
         """
         current_value = self.read_byte(0x08)
         if display_trco:
-            self.write_byte(0x08, (current_value | 0b100000))
+            self.write_byte(0x08, (current_value | 0b00100000))
         else:
             self.write_byte(0x08, (current_value & 0b11011111))
 
