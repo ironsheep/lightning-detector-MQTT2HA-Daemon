@@ -98,9 +98,9 @@ You'll need to know the hostname (or IP address) of the machine where the MQTT b
 
 ## Connecting the AS3935 to your Raspberry Pi
 
-You'll need the AS3935 Lightning sensor to be connected via SPI to your RPi.  Here's the pinout I use: (chose pins close together to make easy to wire up)
+You'll need the AS3935 Lightning sensor to be connected via SPI to your RPi. It is possible that your model RPi supports more than one SPI bus (numbered SPI0, SPI1, SPI2, etc.) The SPI0 device is exposed on our 40pin GPIO header.  Here's the pinout I use: (chose pins close together to make easy to wire up)
 
-| AS3935 Pin      | Module Pin  | Raspberry Pi Pin |
+| AS3935 Pin      | Module Pin  | Raspberry Pi: SPI0 |
 |-----------------|-------------|------------------|
 | 4 (GND)         | GND         | 25 (Ground)   |
 | 5 (VDD)         | 3V3         | 17 (3.3v)     |
@@ -142,13 +142,13 @@ vim /ISP-lightning-mqtt-daemon/config.ini
 
 When you are ready to test your adjustments to the config.ini file you can start an MQTT monitor tool to see what your newly adjusted script will do. (I use [MQTTBox](http://workswithweb.com/mqttbox.html) to monitor all my MQTT testing.)
 
-Once you are ready to monitor, first start the PiGPIOd service
+Once you are ready to test, start the PiGPIOd service
 
 ```shell
 sudo systemctl start pigpiod.service
 ```
 
-Then a first test run is as easy as:
+Then a test run is as easy as:
 
 ```shell
 python3 /opt/ISP-lightning-mqtt-daemon/ISP-lightning-mqtt-daemon.py

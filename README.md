@@ -77,6 +77,8 @@ This Lightning Detector as a sensor provides the following readings:
 | `distance`      | distance to storm front |
 | `count`      | # detections since last report |
 
+
+
 \* (*from the datasheet*: If the received signal is classified as lightning, the energy is calculated. *This value is just a pure number and has no physical meaning*.)
 
 ## Prerequisites
@@ -98,15 +100,18 @@ You'll need to know the hostname (or IP address) of the machine where the MQTT b
 
 ## Connecting the AS3935 to your Raspberry Pi
 
-You'll need the AS3935 Lightning sensor to be connected (via I2C for now) to your RPi.  Here's the pinout I use:
+You'll need the AS3935 Lightning sensor to be connected (via I2C for now) to your RPi.  It is possible that your model RPi supports more than one I2C bus (numbered I2C0, I2C1, I2C2, etc.) The I2C0 device is exposed on our 40pin GPIO header.  Here's the pinout I use: (chose pins close together to make easy to wire up)
 
-| AS3935 Pin      | Module Pin | Raspberry Pi Pin |
+
+| AS3935 Pin      | Module Pin | Raspberry Pi: I2C0 |
 |-----------------|------------|------------------|
 | 4 (GND)         | GND        | 9 (Ground) |
 | 5 (VDD)         | 3V3        | 1 (3.3v) |
 | 10 (IRQ)        | INT        | 11 (GPIO 17) |
 | 11 (I2CL)       | SCL        | 5 (SCL) |
 | 13 (I2CD)       | SDA / MOSI | 3 (SDA) |
+
+Make sure that if **sensor_attached = ...** in your config.ini is uncommented that it is set to I2C! If it is commented out this script defaults to I2C.
 
 (You can use a different GPIO pin for the IRQ, but remember to change your config.ini:**intr_pin = 17** value to the GPIO # you choose.)
 
@@ -138,7 +143,13 @@ vim /ISP-lightning-mqtt-daemon/config.ini
 
 When you are ready to test your adjustments to the config.ini file you can start an MQTT monitor tool to see what your newly adjusted script will do. (I use [MQTTBox](http://workswithweb.com/mqttbox.html) to monitor all my MQTT testing.)
 
-Once you are ready to monitor then a first test run is as easy as:
+Once you are ready to test, start the PiGPIOd service
+
+```shell
+sudo systemctl start pigpiod.service
+```
+
+Then a test run is as easy as:
 
 ```shell
 python3 /opt/ISP-lightning-mqtt-daemon/ISP-lightning-mqtt-daemon.py
