@@ -100,10 +100,10 @@ You'll need to know the hostname (or IP address) of the machine where the MQTT b
 
 ## Connecting the AS3935 to your Raspberry Pi
 
-You'll need the AS3935 Lightning sensor to be connected (via I2C for now) to your RPi.  It is possible that your model RPi supports more than one I2C bus (numbered I2C0, I2C1, I2C2, etc.) The I2C0 device is exposed on our 40pin GPIO header.  Here's the pinout I use: (chose pins close together to make easy to wire up)
+You'll need the AS3935 Lightning sensor to be connected (via I2C for now) to your RPi.  It is possible that your model RPi supports more than one I2C bus (numbered I2C0, I2C1, I2C2, etc.) The I2C1 device is exposed on our 40pin GPIO header for general use while I2C0 is generally used for a piHat EEPROM.  Here's the pinout I use: (chose pins close together to make easy to wire up)
 
 
-| AS3935 Pin      | Module Pin | Raspberry Pi: I2C0 |
+| AS3935 Pin      | Module Pin | Raspberry Pi: I2C1 |
 |-----------------|------------|------------------|
 | 4 (GND)         | GND        | 9 (Ground) |
 | 5 (VDD)         | 3V3        | 1 (3.3v) |
