@@ -29,7 +29,7 @@ from signal import signal, SIGPIPE, SIG_DFL
 
 signal(SIGPIPE,SIG_DFL)
 
-script_version = "2.2.3"
+script_version = "2.2.4"
 script_name = 'ISP-lightning-mqtt-daemon.py'
 script_info = '{} v{}'.format(script_name, script_version)
 project_name = 'lightning-detector-MQTT2HA-Daemon'
@@ -939,6 +939,7 @@ if opt_testing == False and sensor_using_spi == False:
 # -----------------------------------------------------------------------------
 #  Now just talk with our AS3935 connected via I2c or SPI
 # -----------------------------------------------------------------------------
+detector.setDebug(opt_debug)    # forward our debug flag to our underlying library
 
 # but first, let's see if we have a communicating device!
 print_line('- Testing AS3935 Communications...', debug=True)
@@ -1026,11 +1027,15 @@ def handle_interrupt(channel):
                 distance = synth_distance
                 energy = synth_energy
 
+            print_line('- distance=[{}], energy=[{}]'.format(distance, energy), debug=True)
+
             strikes_since_last_alert += 1
 
             distanceStr = str(distance) + "km"
             if distance == None:
                 distanceStr = 'out-of-range'
+            elif distance == 1:
+                distanceStr = 'overhead'
             print_line(" -- Energy: " + str(energy) + " - Distance: " + distanceStr)
 
             # if we are past the end of this period then snap it and start accumulating all over

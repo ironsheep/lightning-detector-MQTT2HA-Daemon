@@ -25,6 +25,11 @@ INT_D = 0b0100
 INT_L = 0b1000
 
 class AS3935_Base:
+    REG_01 = 0x01
+    REG_02 = 0x02
+    REG_03 = 0x03
+    REG_04 = 0x04
+    REG_05 = 0x05
     def __init__(self, irq, bus=1, address=0x03):
         """
         Configure the main parameters of AS3935.
@@ -38,6 +43,7 @@ class AS3935_Base:
         self.irq = irq
         self.pi = pigpio.pi()
         self.device = None
+        self.debug = False
         # Let our derived classes handle this!
         #self.i2c_device = self.pi.i2c_open(bus, address)
 
@@ -49,6 +55,14 @@ class AS3935_Base:
         #self.pi.i2c_close()
         #self.i2c_device = None
         self.device = None
+
+    def setDebug(self, enableState=True):
+        self.debug = enableState
+
+    def print_line(self, text, className='AS3935_Base', error=False, warning=False, info=False, verbose=False, debug=False):
+        if debug:
+            if self.debug:
+                print('[{}] - (DBG): {}'.format(className, text))
 
     # ------ CONFIGURE FUNCTIONS ------ #
 
@@ -106,7 +120,7 @@ class AS3935_Base:
         """
         Sets the AS3935 on power down mode (PWD)
         """
-        self.write_byte(0x00, self.read_byte(0x00) & 0b11111111)
+        self.write_byte(0x00, self.read_byte(0x00) | 0x01)
 
     def listening_mode(self):
         """
@@ -121,12 +135,14 @@ class AS3935_Base:
         """
         Sends a direct command to 0x3C to reset to default values.
         """
+        self.print_line('++ reset chip to default values', debug=True)
         self.write_byte(0x3C, 0x96)
 
     def calibrate_rco(self):
         """
         Sends a direct command to 0x3D to calibrate the RCO (CALIB_RCO)
         """
+        self.print_line('++ calibrate RC Osc.', debug=True)
         self.write_byte(0x3D, 0x96)
 
     # ------------- 8.7- AFE AND WATCHDOG ------------ #
@@ -271,11 +287,12 @@ class AS3935_Base:
         :return: (int/None) last strike's distance in km. None if out of range, 0 if overhead
         """
         dist = self.read_byte(0x07) & 0b00111111
+        distInterp = dist
         if dist == 0b111111:
-            return None
-        elif dist == 0b000001:
-            return 0
-        return dist
+            distInterp =  None
+        if distInterp != dist:
+            self.print_line('++ returning [{}] for [{}]'.format(distInterp, dist), debug=True)
+        return distInterp
 
     # ------------- 8.9.4- INTERRUPTION MANAGEMENT ------------ #
 
@@ -573,7 +590,9 @@ class AS3935_I2C(AS3935_Base):
         :param address: (int) the address to read from
         :return: (int) the value of the address
         """
-        return self.pi.i2c_read_byte_data(self.device, address)
+        value = self.pi.i2c_read_byte_data(self.device, address)
+        self.print_line('---::  addr({}):   ({:08b})'.format(hex(address), value), debug=True)
+        return value
 
     def write_byte(self, address, value):
         """
@@ -586,8 +605,11 @@ class AS3935_I2C(AS3935_Base):
         if not 0 <= value <= 255:
             raise ValueError("The value should be between 0x00 and 0xFF")
         self.pi.i2c_write_byte_data(self.device, address, value)
+        self.print_line('---::  addr({}) <= ({:08b})'.format(hex(address), value), debug=True)
         time.sleep(0.002)
 
+    def print_line(self, text, className='AS3935_I2C', error=False, warning=False, info=False, verbose=False, debug=False):
+        super().print_line(text, className=className, error=error, warning=warning, info=info, verbose=verbose, debug=debug)
 
 """
     This class overrides the base adding all the SPI specifics
@@ -671,6 +693,7 @@ class AS3935_SPI(AS3935_Base):
         bytesRead = self.read_bytes(address, 1)
         if not len(bytesRead) > 0:
             raise AssertionError('At least 1 byte should have been returned from SPI device!')
+        self.print_line('---::  addr({}):   ({:08b})'.format(hex(address), bytesRead[0]), debug=True)
         return bytesRead[0]
 
     def write_byte(self, address, value):
@@ -688,4 +711,8 @@ class AS3935_SPI(AS3935_Base):
 
         write_cmd = [ address & 0x3f | self.BITS_A7A6_WRITE, value ]
         self.device.writebytes(write_cmd)
+        self.print_line('---::  addr({}) <= ({:08b})'.format(hex(address), value), debug=True)
         time.sleep(0.002)
+
+    def print_line(self, text, className='AS3935_SPI', error=False, warning=False, info=False, verbose=False, debug=False):
+        super().print_line(text, className=className, error=error, warning=warning, info=info, verbose=verbose, debug=debug)
