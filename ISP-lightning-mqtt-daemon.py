@@ -29,7 +29,7 @@ from signal import signal, SIGPIPE, SIG_DFL
 
 signal(SIGPIPE,SIG_DFL)
 
-script_version = "2.2.5"
+script_version = "2.2.6"
 script_name = 'ISP-lightning-mqtt-daemon.py'
 script_info = '{} v{}'.format(script_name, script_version)
 project_name = 'lightning-detector-MQTT2HA-Daemon'
@@ -388,6 +388,22 @@ if not disable_mqtt:
 # -----------------------------------------------------------------------------
 #  Perform our MQTT Discovery Announcement...
 # -----------------------------------------------------------------------------
+host_mac = ''
+host_ipaddr = ''
+host_interface = ''
+
+def getHostSpecifics():
+    global host_mac
+    global host_ipaddr
+    global host_interface
+    gw = os.popen("/sbin/ip -4 route show default").read().split()
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect((gw[2], 0))
+    host_ipaddr = s.getsockname()[0]
+    host_interface = gw[4]
+    ether = os.popen("/sbin/ifconfig " + host_interface + "| /bin/grep ether").read().split()
+    host_mac = ether[1]
+
 
 # our lighting device
 LD_TIMESTAMP = "last"
@@ -399,17 +415,10 @@ LD_PAST_RINGS = "prings"
 LD_SETTINGS = "settings"
 
 # what device are we on?
-gw = os.popen("ip -4 route show default").read().split()
-s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-s.connect((gw[2], 0))
-ipaddr = s.getsockname()[0]
-interface = gw[4]
-ether = os.popen("ifconfig " + interface + "| grep ether").read().split()
-mac = ether[1]
-fqdn = socket.getfqdn()
 
-uniqID = "AS3935-{}".format(mac.lower().replace(":", ""))
-
+getHostSpecifics()
+uniqID = "AS3935-{}".format(host_mac.lower().replace(":", ""))
+print_line('- ip=[{}], mac[{}], interface=[{}], uniq-id=[{}]'.format(host_ipaddr, host_mac, host_interface, uniqID), debug=True)
 # Publish our MQTT auto discovery
 #  table of key items to publish:
 detectorValues = OrderedDict([
@@ -467,7 +476,7 @@ for [sensor, params] in detectorValues.items():
     if 'device_ident' in params:
         payload['dev'] = {
                 'identifiers' : ["{}".format(uniqID)],
-                'connections' : [["mac", mac.lower()], [interface, ipaddr]],
+                'connections' : [["mac", host_mac.lower()], [host_interface, host_ipaddr]],
                 'manufacturer' : '(Austria Micro Systems) ams AG',
                 'name' : params['device_ident'],
                 'model' : 'Lightning Detector (AS3935)',
