@@ -9,6 +9,9 @@ __pycache__/
 # yeah, don't set my custom file
 config.ini
 
+# Don't save VSCode files
+*.code-workspace
+
 # C extensions
 *.so
 
