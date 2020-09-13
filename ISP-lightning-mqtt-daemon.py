@@ -29,7 +29,7 @@ from signal import signal, SIGPIPE, SIG_DFL
 
 signal(SIGPIPE,SIG_DFL)
 
-script_version = "2.2.6"
+script_version = "2.2.7"
 script_name = 'ISP-lightning-mqtt-daemon.py'
 script_info = '{} v{}'.format(script_name, script_version)
 project_name = 'lightning-detector-MQTT2HA-Daemon'
@@ -120,6 +120,7 @@ if opt_calc_tuning_cap:
 # Eclipse Paho callbacks - http://www.eclipse.org/paho/clients/python/docs/#callbacks
 mqtt_client_connected = False
 print_line('* init mqtt_client_connected=[{}]'.format(mqtt_client_connected), debug=True)
+mqtt_client_should_attempt_reconnect = True
 
 # Eclipse Paho callbacks - http://www.eclipse.org/paho/clients/python/docs/#callbacks
 def on_connect(client, userdata, flags, rc):
@@ -159,10 +160,19 @@ except IOError:
 daemon_enabled = config['Daemon'].getboolean('enabled', True)
 
 default_base_topic = 'home/nodes'
-default_sensor_name = 'lightningdetector'
-
 base_topic = config['MQTT'].get('base_topic', default_base_topic).lower()
+
+default_sensor_name = 'lightningdetector'
 sensor_name = config['MQTT'].get('sensor_name', default_sensor_name).lower()
+
+# Broker connection-failure recovery
+#  Rety connection attempts
+default_retry_count = '5'
+mqtt_client_retry_count = int(config['MQTT'].get('retry_count', default_retry_count))
+
+#  Retry after waiting N seconds
+default_retry_wait_in_seconds = '30'
+mqtt_client_retry_delay_in_seconds = int(config['MQTT'].get('retry_wait_in_seconds', default_retry_wait_in_seconds))
 
 # Read/clear the detector data every 10s in case we missed an interrupt (interrupts happening too fast ?)
 sleep_period = config['Daemon'].getint('period', 10)
@@ -362,26 +372,43 @@ if config['MQTT'].getboolean('tls', False):
 
 mqtt_username = os.environ.get("MQTT_USERNAME", config['MQTT'].get('username'))
 mqtt_password = os.environ.get("MQTT_PASSWORD", config['MQTT'].get('password', None))
+mqtt_hostname = os.environ.get('MQTT_HOSTNAME', config['MQTT'].get('hostname', 'localhost'))
+
+mqtt_starting_retry_count = mqtt_client_retry_count
 
 if not disable_mqtt:
     if mqtt_username:
         mqtt_client.username_pw_set(mqtt_username, mqtt_password)
-    try:
-        mqtt_client.connect(os.environ.get('MQTT_HOSTNAME', config['MQTT'].get('hostname', 'localhost')),
-                            port=int(os.environ.get('MQTT_PORT', config['MQTT'].get('port', '1883'))),
-                            keepalive=config['MQTT'].getint('keepalive', 60))
-    except:
-        print_line('MQTT connection error. Please check your settings in the configuration file "config.ini"', error=True, sd_notify=True)
-        sys.exit(1)
-    else:
-        mqtt_client.publish(lwt_topic, payload=lwt_online_val, retain=False)
-        mqtt_client.loop_start()
 
-        while mqtt_client_connected == False: #wait in loop
-            print_line('* Wait on mqtt_client_connected=[{}]'.format(mqtt_client_connected), debug=True)
-            sleep(1.0) # some slack to establish the connection
+    while mqtt_client_retry_count >= 0:
+        try:
+            mqtt_client.connect(mqtt_hostname,
+                                port=int(os.environ.get('MQTT_PORT', config['MQTT'].get('port', '1883'))),
+                                keepalive=config['MQTT'].getint('keepalive', 60))
+        except:
+            if mqtt_client_should_attempt_reconnect:
+                if mqtt_client_retry_count > 0:
+                    print_line('MQTT connection error - broker @{} not responding. Retrying in {} seconds... (retry count = {})'.format(mqtt_hostname, mqtt_client_retry_delay_in_seconds, mqtt_client_retry_count), error=True, sd_notify=True)
+                    mqtt_client_retry_count -= 1
+                    sleep(mqtt_client_retry_delay_in_seconds) # some slack to establish the connection
+                else:
+                    print_line('MQTT failed connect after {} retries. Please check your settings in the configuration file "config.ini"'.format(mqtt_starting_retry_count), error=True, sd_notify=True)
+                    sys.exit(1)
+            else:
+                print_line('MQTT connection error, retries NOT enabled. Please check your settings in the configuration file "config.ini"', error=True, sd_notify=True)
+                sys.exit(1)
 
-        startAliveTimer()
+        else:
+            break   # all good, now wait for connection to be established...
+
+    mqtt_client.publish(lwt_topic, payload=lwt_online_val, retain=False)
+    mqtt_client.loop_start()
+
+    while mqtt_client_connected == False: #wait in loop
+        print_line('* Wait on mqtt_client_connected=[{}]'.format(mqtt_client_connected), debug=True)
+        sleep(1.0) # some slack to establish the connection
+
+    startAliveTimer()
 
     sd_notifier.notify('READY=1')
 

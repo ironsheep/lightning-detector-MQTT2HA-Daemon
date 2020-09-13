@@ -55,6 +55,13 @@
 # Path to TLS client auth certificate file
 #tls_certfile =
 
+# Broker connection-failure recovery
+#  Rety connection attempts [default 5]
+#retry_count = 5
+
+#  Retry after waiting N seconds [default 30]
+#retry_wait_in_seconds = 30
+
 [Behavior]
 
 # This script accumulates detections into buckets (rings if you will) for this period of time [2-10] in minutes [Default: 5]
