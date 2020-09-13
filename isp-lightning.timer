@@ -1,0 +1,9 @@
+[Unit]
+Description=Delay isp-lightning start on boot by 30 seconds
+
+[Timer]
+OnBootSec=30s
+Unit=isp-lightning.service
+
+[Install]
+WantedBy=multi-user.target

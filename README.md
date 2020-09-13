@@ -234,13 +234,13 @@ By default the **isp-lightning.service** file indicates that the script should b
 Now that the 'daemon' user is configured to allow access the hardware you can setup the script to be run as a system service as follows:
 
  ```shell
-   sudo ln -s /opt/ISP-lightning-mqtt-daemon/isp-lightning.service /etc/systemd/system/isp-lightning.service
+   sudo ln -sv /opt/ISP-lightning-mqtt-daemon/isp-lightning.{service,timer} /etc/systemd/system/
 
    sudo systemctl daemon-reload
 
-   # configure services so they start on reboot
+   # configure service and timer so they start on reboot
    sudo systemctl enable pigpiod.service
-   sudo systemctl enable isp-lightning.service
+   sudo systemctl enable isp-lightning.timer
 
    # start services now
    sudo systemctl start pigpiod.service
