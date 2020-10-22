@@ -32,11 +32,13 @@ Then go to Interfacing Options -> I2C -> Yes -> Ok.
 
 *Upon saving these changes your RPi will reboot*
 
----
+----
 
-Hey, I will always appreciate your helping me out for a couple of :coffee:'s or :pizza: slices!
+If you like my work and/or this has helped you in some way then feel free to help me out for a couple of :coffee:'s or :pizza: slices!
 
 [![coffee](https://www.buymeacoffee.com/assets/img/custom_images/black_img.png)](https://www.buymeacoffee.com/ironsheep)
+
+----
 
 ## Features
 
