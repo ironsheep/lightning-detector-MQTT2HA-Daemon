@@ -5,7 +5,7 @@
 
 The ISP-lightning-mqtt-daemon.py script starts up by:
 
-* Loading the set up inforamtion from the config.ini (D1)
+* Loading the set up information from the config.ini (D1)
 * Setting up communication with the MQTT Broker
 * Sends LWT details to the MQTT Broker
 * Sends the Home Assistant MQTT Discovery information to the Broker
